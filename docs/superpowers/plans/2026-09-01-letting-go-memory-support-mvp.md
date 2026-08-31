@@ -61,16 +61,20 @@ npm install -D vitest @vitejs/plugin-react firebase-tools
 
 ```
 ANTHROPIC_API_KEY=
-FIREBASE_PROJECT_ID=
+FIREBASE_PROJECT_ID=demo-letting-go
 FIREBASE_CLIENT_EMAIL=
 FIREBASE_PRIVATE_KEY=
 FIRESTORE_EMULATOR_HOST=localhost:8080
 FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199
 ```
 
-`.env.local` をコピーして実際の値を各自のFirebaseプロジェクトから設定するよう `.gitignore` に `.env.local` を追加する。
+`FIREBASE_PROJECT_ID`は`demo-`プレフィックスのダミープロジェクトID（Firebase公式のエミュレータ専用プロジェクトID）にしておく。`FIRESTORE_EMULATOR_HOST`/`FIREBASE_STORAGE_EMULATOR_HOST`が設定されている限り、`FIREBASE_CLIENT_EMAIL`/`FIREBASE_PRIVATE_KEY`は空でよく、実在のFirebaseプロジェクトも実サービスアカウントキーも不要（Step 4のAdmin SDK初期化で分岐する）。本番運用でチームが実プロジェクトを用意した段階で、`FIREBASE_PROJECT_ID`を実プロジェクトIDに、`FIREBASE_CLIENT_EMAIL`/`FIREBASE_PRIVATE_KEY`をそのサービスアカウントの値に差し替え、`FIRESTORE_EMULATOR_HOST`/`FIREBASE_STORAGE_EMULATOR_HOST`を未設定にすればよい。
+
+`.env.local` をコピーして使い、`.gitignore` に `.env.local` を追加する。
 
 - [ ] **Step 4: Firebase Admin SDKの初期化ヘルパーを書く**
+
+エミュレータ利用時（`FIRESTORE_EMULATOR_HOST`が設定されている場合）は、実サービスアカウント情報を一切要求せず、ダミーの`projectId`だけで初期化する。これにより、チームで実Firebaseプロジェクトの合意が取れていない段階でも、ローカルのエミュレータ・自動テストは支障なく動く。本番相当（実プロジェクト）に接続するときだけ`cert()`によるサービスアカウント認証を使う。
 
 `lib/firebase/admin.ts`:
 
@@ -79,17 +83,27 @@ import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { getStorage, type Storage } from "firebase-admin/storage";
 
+function isUsingEmulator(): boolean {
+  return Boolean(process.env.FIRESTORE_EMULATOR_HOST);
+}
+
 function getAdminApp(): App {
   const existing = getApps();
   if (existing.length > 0) return existing[0];
 
+  const projectId = process.env.FIREBASE_PROJECT_ID ?? "demo-letting-go";
+
+  if (isUsingEmulator()) {
+    return initializeApp({ projectId, storageBucket: `${projectId}.appspot.com` });
+  }
+
   return initializeApp({
     credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
+      projectId,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
       privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
     }),
-    storageBucket: `${process.env.FIREBASE_PROJECT_ID}.appspot.com`,
+    storageBucket: `${projectId}.appspot.com`,
   });
 }
 
@@ -156,6 +170,16 @@ Run: `npx vitest run lib/anthropic.test.ts`
 Expected: PASS（2 tests）
 
 - [ ] **Step 9: Firebaseエミュレータ設定を書く**
+
+`.firebaserc`（`demo-`プレフィックスは実プロジェクトの作成・登録なしにFirebase CLIが受け付けるダミープロジェクトID）:
+
+```json
+{
+  "projects": {
+    "default": "demo-letting-go"
+  }
+}
+```
 
 `firebase.json`:
 
