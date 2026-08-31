@@ -26,8 +26,19 @@ function getAdminApp(): App {
   });
 }
 
+let firestoreSettingsApplied = false;
+
 export function getAdminFirestore(): Firestore {
-  return getFirestore(getAdminApp());
+  const db = getFirestore(getAdminApp());
+  if (!firestoreSettingsApplied) {
+    // Repositories write plain domain objects that may have optional
+    // fields left as `undefined` (e.g. Session.note, Item.sourceImageId).
+    // Firestore rejects `undefined` values by default; this makes it skip
+    // them instead, matching how the rest of the plan's repositories are written.
+    db.settings({ ignoreUndefinedProperties: true });
+    firestoreSettingsApplied = true;
+  }
+  return db;
 }
 
 export function getAdminStorage(): Storage {
