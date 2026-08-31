@@ -1,0 +1,1869 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>メルカリ（プロトタイプ）- 自分の部屋から探す</title>
+<style>
+  :root{
+    --bg: #f6f5f1;
+    --panel: #ffffff;
+    --ink: #1f2420;
+    --ink-soft: #5b6259;
+    --line: #e4e1d8;
+    --brand: #ff0211;
+    --brand-dark: #d4000e;
+    --brand-soft: #ffe6e7;
+    --green: #1f7a4d;
+    --green-dark: #14532d;
+    --green-soft: #e4f3ea;
+    --amber: #b8860b;
+    --amber-soft: #fbf1dc;
+    --gray: #8a8f88;
+    --gray-soft: #eceae4;
+    --shadow: 0 10px 30px rgba(31,36,32,0.08);
+    --radius: 16px;
+  }
+  *{box-sizing:border-box;}
+  [hidden]{ display:none !important; }
+  html,body{margin:0;padding:0;}
+  body{
+    background: linear-gradient(180deg,#efeeea,#e2e0d8);
+    color:var(--ink);
+    font-family: "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", system-ui, sans-serif;
+    line-height:1.6;
+    min-height:100vh;
+  }
+
+  .stage-bg{ min-height:100vh; display:flex; align-items:flex-start; justify-content:center; padding:24px 16px; }
+
+  .phone-frame{
+    position:relative;
+    width:390px; max-width:100%; height:760px;
+    background:#0d0d0d;
+    border-radius:46px;
+    padding:12px;
+    box-shadow:0 30px 70px rgba(0,0,0,0.35);
+    flex-shrink:0;
+  }
+  .phone-inner{ position:relative; width:100%; height:100%; background:#fff; border-radius:34px; overflow:hidden; }
+  .phone-notch{
+    position:absolute; top:0; left:50%; transform:translateX(-50%);
+    width:140px; height:26px; background:#0d0d0d; border-radius:0 0 14px 14px; z-index:60;
+  }
+
+  .screen{ position:absolute; inset:0; overflow-y:auto; background:#fff; display:none; }
+  .screen.active{ display:block; }
+  #screen-home.active{ display:flex; flex-direction:column; }
+
+  .app-bar{
+    position:sticky; top:0; z-index:20; background:#fff;
+    display:flex; align-items:center; gap:8px;
+    padding:16px 8px 12px 4px;
+    border-bottom:1px solid var(--line);
+  }
+  .back-chevron{
+    width:32px; height:32px; border:none; background:transparent; font-size:22px;
+    color:var(--ink); cursor:pointer; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+  .app-bar-title{ font-size:16px; font-weight:800; }
+
+  .screen-scroll{ padding:16px 16px 40px; }
+
+  /* --- ホーム画面 --- */
+  .home-header{ padding:34px 14px 8px; display:flex; align-items:center; gap:10px; flex-shrink:0; }
+  .mercari-wordmark{ font-weight:900; font-style:italic; color:var(--brand); font-size:19px; letter-spacing:-0.5px; }
+  .search-bar{
+    flex:1; background:#f2f2f2; border-radius:20px; padding:9px 14px;
+    font-size:12.5px; color:#8a8a8a; display:flex; align-items:center; gap:6px;
+  }
+  .bell-wrap{ position:relative; font-size:19px; flex-shrink:0; }
+  .bell-dot{ position:absolute; top:-2px; right:-2px; width:8px; height:8px; background:var(--brand); border-radius:50%; }
+
+  .home-scroll{ flex:1; overflow-y:auto; padding:4px 14px 16px; }
+  .cat-chip-row{ display:flex; gap:8px; overflow-x:auto; padding:6px 0 16px; }
+  .cat-chip{ flex-shrink:0; padding:7px 14px; border-radius:999px; background:#f2f2f2; font-size:12px; font-weight:700; color:#555; }
+  .cat-chip.active{ background:var(--brand); color:#fff; }
+
+  .home-section-title{ font-size:13.5px; font-weight:800; margin:4px 0 10px; }
+  .item-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+  .mock-item{ background:#fafafa; border:1px solid var(--line); border-radius:10px; padding:10px; position:relative; }
+  .mock-item .mi-thumb{ font-size:32px; text-align:center; padding:16px 0 12px; }
+  .mock-item .mi-name{ font-size:11.5px; color:#333; }
+  .mock-item .mi-price{ font-size:13px; font-weight:800; margin-top:2px; }
+  .mock-item .mi-heart{ position:absolute; top:8px; right:8px; font-size:12.5px; color:#c3c3c3; }
+
+  .tab-bar{ display:flex; border-top:1px solid var(--line); background:#fff; flex-shrink:0; }
+  .tab-item{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+    padding:8px 0 10px; font-size:9.5px; color:#9a9a9a; background:none; border:none; cursor:pointer;
+  }
+  .tab-item .tab-icon{ font-size:19px; }
+  .tab-item.active{ color:var(--brand); }
+  .tab-sell .tab-icon{
+    width:32px; height:32px; border-radius:50%; background:var(--brand); color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:15px;
+  }
+
+  /* --- 出品方法シート --- */
+  .sheet-backdrop{
+    position:absolute; inset:0; background:rgba(0,0,0,0.4); z-index:40;
+    opacity:0; pointer-events:none; transition:opacity .2s ease;
+  }
+  .sheet-backdrop.open{ opacity:1; pointer-events:auto; }
+  .sheet{
+    position:absolute; left:0; right:0; bottom:0; background:#fff;
+    border-radius:20px 20px 0 0; padding:10px 18px 26px; z-index:50;
+    transform:translateY(110%); transition:transform .25s ease;
+    box-shadow:0 -10px 30px rgba(0,0,0,0.15);
+  }
+  .sheet.open{ transform:translateY(0); }
+  .sheet-handle{ width:36px; height:4px; background:#ddd; border-radius:2px; margin:4px auto 14px; }
+  .sheet-title{ font-size:13.5px; font-weight:800; color:var(--ink-soft); margin-bottom:12px; text-align:center; }
+  .sheet-option{
+    width:100%; text-align:left; padding:14px 14px; border:1.5px solid var(--line); border-radius:12px;
+    background:#fff; font-size:14px; font-weight:700; margin-bottom:10px;
+    display:flex; align-items:center; gap:10px; color:var(--ink);
+  }
+  .sheet-option[disabled]{ opacity:.4; }
+  .sheet-option-new{ border-color:var(--brand); color:var(--brand-dark); }
+  .new-badge{ margin-left:auto; background:var(--brand); color:#fff; font-size:9.5px; font-weight:800; padding:2px 7px; border-radius:999px; }
+  .sheet-cancel{ width:100%; text-align:center; padding:12px; background:transparent; border:none; color:var(--ink-soft); font-weight:700; font-size:13.5px; }
+
+  /* --- 既存機能: 条件入力・結果 --- */
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:20px;
+  }
+
+  h1.hero{ font-size:19px; font-weight:800; margin:0 0 6px; color:var(--ink); }
+  p.hero-sub{ margin:0 0 20px; color:var(--ink-soft); font-size:13px; }
+
+  .field{ margin-bottom:20px; }
+  .field label.field-label{ display:block; font-size:12.5px; font-weight:700; color:var(--ink); margin-bottom:8px; }
+  .field .field-hint{ font-size:11.5px; color:var(--ink-soft); margin-top:6px; }
+
+  input[type="number"].yen-input{
+    width:100%; font-size:24px; font-weight:800; padding:12px 14px;
+    border:1.5px solid var(--line); border-radius:12px; color:var(--brand-dark); background:#fbfbf9;
+  }
+  input[type="number"].yen-input:focus{ outline:2px solid var(--brand); border-color:var(--brand); }
+
+  .chip-row{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{
+    padding:9px 14px; border-radius:999px; border:1.5px solid var(--line); background:#fbfbf9;
+    font-size:13px; font-weight:600; color:var(--ink-soft); cursor:pointer; user-select:none; transition:all .12s ease;
+  }
+  .chip:hover{ border-color:var(--brand); }
+  .chip.selected{ background:var(--brand); border-color:var(--brand); color:#fff; }
+
+  .photo-picker{ display:flex; gap:10px; flex-wrap:wrap; align-items:stretch; }
+  .photo-thumb{
+    width:110px; height:86px; border-radius:12px; border:2px solid var(--line);
+    cursor:pointer; position:relative; overflow:hidden; flex-shrink:0;
+  }
+  .photo-thumb.selected{ border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-soft); }
+  .photo-thumb .thumb-label{
+    position:absolute; left:0; right:0; bottom:0; background:rgba(20,20,20,0.72);
+    color:#fff; font-size:10px; text-align:center; padding:3px 0;
+  }
+  .thumb-room1{ background:linear-gradient(180deg,#cfe3d8 0%, #cfe3d8 55%, #b8a583 55%, #b8a583 100%); }
+  .thumb-room2{ background:linear-gradient(180deg,#dbe6f2 0%, #dbe6f2 50%, #cbb994 50%, #cbb994 100%); }
+
+  .upload-box{
+    width:110px; height:86px; border-radius:12px; border:2px dashed var(--line);
+    display:flex; align-items:center; justify-content:center; flex-direction:column;
+    font-size:10.5px; color:var(--ink-soft); text-align:center; cursor:pointer; flex-shrink:0; padding:6px;
+  }
+  .upload-box:hover{ border-color:var(--brand); color:var(--brand); }
+  .upload-box.selected{ border-color:var(--brand); background:var(--brand-soft); color:var(--brand-dark); }
+  #file-input{ display:none; }
+
+  .cta{
+    width:100%; margin-top:10px; padding:15px; font-size:15px; font-weight:800; color:#fff;
+    background:var(--brand); border:none; border-radius:12px; cursor:pointer;
+    box-shadow:0 8px 18px rgba(212,0,14,0.25);
+  }
+  .cta:hover{ background:var(--brand-dark); }
+  .cta:disabled{ opacity:.4; cursor:not-allowed; box-shadow:none; }
+  .cta.ghost{
+    background:transparent; color:var(--brand-dark); box-shadow:none; border:1.5px solid var(--line);
+    font-weight:700; font-size:13.5px; padding:11px;
+  }
+  .cta.ghost:hover{ border-color:var(--brand); }
+
+  #screen-loading .card{ text-align:center; padding:56px 22px; margin-top:40px; }
+  .spinner{
+    width:44px; height:44px; margin:0 auto 22px; border:4px solid var(--brand-soft);
+    border-top-color:var(--brand); border-radius:50%; animation:spin 0.9s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  #loading-msg{ font-size:14px; color:var(--ink-soft); font-weight:600; min-height:20px; }
+
+  .summary-bar{ display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+  .summary-tile{
+    flex:1; min-width:130px; background:var(--panel); border:1px solid var(--line);
+    border-radius:14px; padding:14px 16px; box-shadow:var(--shadow);
+  }
+  .summary-tile .stile-label{ font-size:11px; color:var(--ink-soft); font-weight:700; margin-bottom:4px; }
+  .summary-tile .stile-value{ font-size:19px; font-weight:800; color:var(--brand-dark); }
+  .summary-tile.warn .stile-value{ color:var(--amber); }
+  .summary-tile.done .stile-value{ color:var(--green); }
+
+  .ar-stage{
+    position:relative; width:100%; height:280px; border-radius:var(--radius); overflow:hidden;
+    border:1px solid var(--line); box-shadow:var(--shadow); margin-bottom:20px;
+    background-size:cover; background-position:center;
+  }
+  .ar-stage[data-room="room1"]{ background: linear-gradient(180deg,#dcecdf 0%, #dcecdf 58%, #b9a67f 58%, #a89168 100%); }
+  .ar-stage[data-room="room2"]{ background: linear-gradient(180deg,#e2ecf6 0%, #e2ecf6 52%, #cbb994 52%, #b8a37c 100%); }
+  .ar-stage[data-room="custom"]{ background-color:#e9e7df; }
+
+  .decor{ position:absolute; opacity:0.9; }
+  .decor-couch{ width:190px; height:58px; left:6%; bottom:16%; background:#8b6b52; border-radius:16px 16px 4px 4px; }
+  .decor-rug{ width:220px; height:32px; right:4%; bottom:8%; background:#c98a5c; border-radius:50%; opacity:0.55; }
+  .decor-shelf{ width:120px; height:90px; right:8%; top:10%; background:#6b5643; border-radius:6px; }
+  .decor-bed{ width:170px; height:74px; left:6%; bottom:10%; background:#e7dfd0; border:5px solid #7a6a52; border-radius:10px; }
+  .decor-desk{ width:130px; height:48px; right:6%; bottom:14%; background:#7a6a52; border-radius:4px; }
+  .ar-stage[data-room="room1"] .decor-bed,
+  .ar-stage[data-room="room1"] .decor-desk,
+  .ar-stage[data-room="room2"] .decor-couch,
+  .ar-stage[data-room="room2"] .decor-rug,
+  .ar-stage[data-room="custom"] .decor{ display:none; }
+
+  .item-marker{ position:absolute; transform:translate(-50%,-50%); display:flex; flex-direction:column; align-items:center; cursor:pointer; }
+  .item-emoji{ font-size:26px; filter:drop-shadow(0 3px 6px rgba(0,0,0,0.25)); transition:transform .15s ease; }
+  .item-marker:hover .item-emoji{ transform:scale(1.15); }
+  .item-marker.highlight .item-emoji{ transform:scale(1.25); }
+  .price-chip{
+    margin-top:2px; font-size:10.5px; font-weight:800; padding:3px 8px; border-radius:999px;
+    white-space:nowrap; color:#fff; box-shadow:0 3px 8px rgba(0,0,0,0.2);
+  }
+  .price-chip.recommended{ background:var(--green); }
+  .price-chip.caution{ background:var(--amber); }
+  .price-chip.do_not_suggest{ background:var(--gray); }
+
+  .legend{ display:flex; gap:14px; font-size:11px; color:var(--ink-soft); margin:-6px 0 18px; flex-wrap:wrap; }
+  .legend span{ display:inline-flex; align-items:center; gap:5px; }
+  .dot{ width:9px; height:9px; border-radius:50%; display:inline-block; }
+  .dot.recommended{ background:var(--green); }
+  .dot.caution{ background:var(--amber); }
+  .dot.do_not_suggest{ background:var(--gray); }
+
+  .section-title{ font-size:14px; font-weight:800; margin:22px 0 12px; color:var(--ink); }
+
+  .candidate-list{ display:flex; flex-direction:column; gap:10px; }
+  .candidate-card{
+    background:var(--panel); border:1.5px solid var(--line); border-radius:14px; padding:14px 16px;
+    display:flex; gap:12px; align-items:flex-start; box-shadow:var(--shadow); transition:border-color .15s ease;
+  }
+  .candidate-card.highlight{ border-color:var(--brand); }
+  .candidate-card .cc-emoji{ font-size:28px; line-height:1; margin-top:2px; }
+  .candidate-card .cc-body{ flex:1; min-width:0; }
+  .cc-top{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .cc-name{ font-weight:800; font-size:14px; }
+  .cc-price{ font-weight:800; font-size:14px; color:var(--brand-dark); white-space:nowrap; }
+  .cc-meta{ display:flex; gap:10px; font-size:11px; color:var(--ink-soft); margin:6px 0 8px; flex-wrap:wrap; }
+  .cc-reason{ font-size:12.5px; color:var(--ink-soft); }
+  .cc-alt{ font-size:12px; color:var(--amber); margin-top:6px; font-weight:600; }
+  .badge{ font-size:10.5px; font-weight:800; padding:2px 9px; border-radius:999px; }
+  .badge.recommended{ background:var(--green-soft); color:var(--green-dark); }
+  .badge.caution{ background:var(--amber-soft); color:var(--amber); }
+  .badge.do_not_suggest{ background:var(--gray-soft); color:var(--gray); }
+
+  .cc-toggle-wrap{ display:flex; align-items:center; margin-top:2px; }
+  .cc-toggle{ width:19px; height:19px; accent-color:var(--brand); cursor:pointer; }
+  .cc-toggle:disabled{ opacity:0.35; cursor:not-allowed; }
+
+  .plan-box{ margin-top:22px; background:var(--brand-soft); border:1.5px solid var(--brand); border-radius:14px; padding:16px 18px; }
+  .plan-box .plan-title{ font-weight:800; font-size:13px; color:var(--brand-dark); margin-bottom:6px; }
+  .plan-box .plan-total{ font-size:21px; font-weight:800; color:var(--brand-dark); }
+  .plan-box .plan-note{ font-size:12px; color:var(--brand-dark); opacity:0.8; margin-top:4px; }
+
+  .back-row{ margin-top:24px; display:flex; flex-direction:column; gap:10px; }
+
+  /* --- 出品下書き画面 --- */
+  .progress-banner{
+    background:var(--brand-soft); color:var(--brand-dark); font-size:12px; font-weight:700;
+    padding:9px 14px; border-radius:10px; margin-bottom:16px;
+  }
+  .draft-photo{
+    width:100%; aspect-ratio:1/1; max-height:170px; background:#f2f2f2; border-radius:12px;
+    display:flex; align-items:center; justify-content:center; font-size:64px; margin-bottom:18px;
+  }
+  .draft-field{ margin-bottom:18px; }
+  .draft-field label{ display:block; font-size:12px; font-weight:700; color:var(--ink-soft); margin-bottom:6px; }
+  .draft-input, .draft-textarea{
+    width:100%; border:1.5px solid var(--line); border-radius:10px; padding:11px 12px;
+    font-size:13.5px; font-family:inherit; color:var(--ink); background:#fbfbf9;
+  }
+  .draft-textarea{ min-height:80px; resize:vertical; }
+  .draft-static-row{
+    display:flex; justify-content:space-between; align-items:center; padding:12px 2px;
+    border-bottom:1px solid var(--line); font-size:13px;
+  }
+  .draft-static-row .dsr-value{ color:var(--ink-soft); }
+  .draft-price-wrap{ display:flex; align-items:center; gap:6px; border:1.5px solid var(--line); border-radius:10px; padding:0 12px; background:#fbfbf9; }
+  .draft-price-wrap span{ font-size:18px; font-weight:800; color:var(--ink-soft); }
+  .draft-price-wrap input{ border:none; background:none; font-size:20px; font-weight:800; padding:11px 4px; width:100%; color:var(--ink); }
+  .draft-price-wrap input:focus{ outline:none; }
+  .fee-row{ display:flex; justify-content:space-between; font-size:12.5px; color:var(--ink-soft); margin-top:8px; }
+  .fee-row.profit{ font-weight:800; color:var(--ink); }
+
+  .draft-success{ text-align:center; padding:40px 10px; }
+  .draft-success .ds-icon{ font-size:52px; margin-bottom:14px; }
+  .draft-success .ds-title{ font-size:16.5px; font-weight:800; margin-bottom:8px; }
+  .draft-success .ds-sub{ font-size:12.5px; color:var(--ink-soft); margin-bottom:26px; }
+
+  /* --- 思い出ベース手放し判断支援 --- */
+  .promo-banner{
+    margin:2px 0 16px; background:linear-gradient(135deg,#fff4e0,#ffe9d6); border:1.5px solid #f2c98a;
+    border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:12px; cursor:pointer;
+  }
+  .promo-banner .pb-icon{ font-size:24px; flex-shrink:0; }
+  .promo-banner .pb-text{ flex:1; font-size:12px; font-weight:700; color:#7a5416; }
+  .promo-banner .pb-chevron{ font-size:18px; color:#b8860b; }
+
+  .photo-thumb-d{ width:110px; height:86px; border-radius:12px; border:2px solid var(--line); cursor:pointer; position:relative; overflow:hidden; flex-shrink:0; }
+  .photo-thumb-d.selected{ border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-soft); }
+  .photo-thumb-d .thumb-label{ position:absolute; left:0; right:0; bottom:0; background:rgba(20,20,20,0.72); color:#fff; font-size:10px; text-align:center; padding:3px 0; }
+
+  .deck-progress{ font-size:12px; color:var(--ink-soft); font-weight:700; margin-bottom:14px; text-align:center; }
+  .deck-stage{ position:relative; height:320px; margin-bottom:20px; }
+  .deck-card{
+    position:absolute; inset:0; background:var(--panel); border:1.5px solid var(--line); border-radius:20px;
+    box-shadow:var(--shadow); display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:24px; touch-action:none; cursor:grab; user-select:none; z-index:2;
+  }
+  .deck-card.next-peek{ transform:scale(0.94) translateY(10px); opacity:0.6; z-index:1; cursor:default; }
+  .deck-card .dc-emoji{ font-size:68px; margin-bottom:16px; }
+  .deck-card .dc-name{ font-size:16.5px; font-weight:800; margin-bottom:6px; text-align:center; }
+  .deck-card .dc-price{ font-size:13px; color:var(--ink-soft); }
+  .deck-card .dc-stamp{
+    position:absolute; top:22px; font-size:19px; font-weight:900; padding:5px 13px; border-radius:8px;
+    border:3px solid; transform:rotate(-12deg); opacity:0; pointer-events:none;
+  }
+  .deck-card .dc-stamp.keep{ left:18px; color:var(--gray); border-color:var(--gray); }
+  .deck-card .dc-stamp.release{ right:18px; color:var(--green); border-color:var(--green); transform:rotate(12deg); }
+
+  .deck-buttons{ display:flex; gap:10px; justify-content:center; }
+  .deck-btn{
+    flex:1; max-width:150px; padding:13px 6px; border-radius:14px; border:1.5px solid var(--line); background:#fff;
+    font-size:12px; font-weight:700; display:flex; flex-direction:column; align-items:center; gap:4px; color:var(--ink);
+  }
+  .deck-btn .db-icon{ font-size:19px; }
+  .deck-btn.keep{ color:var(--ink-soft); }
+  .deck-btn.unsure{ border-color:var(--amber); color:var(--amber); }
+  .deck-btn.release{ border-color:var(--green); color:var(--green-dark); }
+
+  .chat-item-header{ display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+  .chat-item-header .cih-emoji{ font-size:28px; }
+  .chat-item-header .cih-name{ font-weight:800; font-size:14.5px; }
+  .chat-log{ display:flex; flex-direction:column; gap:10px; margin-bottom:14px; }
+  .chat-bubble{ max-width:88%; padding:10px 14px; border-radius:14px; font-size:12.5px; line-height:1.55; }
+  .chat-bubble.ai{ background:#f2f2f2; color:var(--ink); align-self:flex-start; border-bottom-left-radius:4px; }
+  .chat-bubble.user{ background:var(--brand); color:#fff; align-self:flex-end; border-bottom-right-radius:4px; }
+  .chat-bubble.summary{ background:var(--brand-soft); color:var(--brand-dark); align-self:stretch; border-radius:14px; font-weight:600; }
+  .chat-choices{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px; }
+  .chat-choice{
+    padding:9px 14px; border-radius:999px; border:1.5px solid var(--brand); background:#fff; color:var(--brand-dark);
+    font-size:12px; font-weight:700;
+  }
+  .decision-row{ display:flex; gap:10px; }
+  .decision-btn{ flex:1; padding:13px 6px; border-radius:12px; border:1.5px solid var(--line); background:#fff; font-size:13px; font-weight:800; }
+  .decision-btn.sell{ border-color:var(--green); color:var(--green-dark); }
+  .decision-btn.keep{ border-color:var(--gray); color:var(--ink-soft); }
+  .decision-btn.hold{ border-color:var(--amber); color:var(--amber); }
+
+  .final-list{ display:flex; flex-direction:column; gap:10px; margin-bottom:20px; }
+  .final-row{ background:var(--panel); border:1.5px solid var(--line); border-radius:14px; padding:14px 16px; }
+  .final-row-top{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .final-row-top .fr-emoji{ font-size:23px; }
+  .final-row-top .fr-name{ font-weight:800; font-size:13px; flex:1; }
+  .final-row-top .fr-price{ font-size:12px; color:var(--ink-soft); }
+  .decision-chip-row{ display:flex; gap:8px; }
+  .decision-chip{
+    flex:1; text-align:center; padding:8px 4px; border-radius:999px; border:1.5px solid var(--line);
+    font-size:11.5px; font-weight:700; color:var(--ink-soft); background:#fbfbf9;
+  }
+  .decision-chip.selected.sell{ background:var(--green); border-color:var(--green); color:#fff; }
+  .decision-chip.selected.keep{ background:var(--gray); border-color:var(--gray); color:#fff; }
+  .decision-chip.selected.hold{ background:var(--amber); border-color:var(--amber); color:#fff; }
+
+  .tag-chip-row{ display:flex; flex-wrap:wrap; gap:8px; }
+  .tag-chip{ padding:8px 13px; border-radius:999px; border:1.5px solid var(--line); background:#fbfbf9; font-size:12px; font-weight:600; color:var(--ink-soft); }
+  .tag-chip.selected{ background:var(--brand); border-color:var(--brand); color:#fff; }
+
+  .mypage-header{ padding:26px 18px 16px; display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--line); }
+  .mypage-avatar{ width:52px; height:52px; border-radius:50%; background:#f2f2f2; display:flex; align-items:center; justify-content:center; font-size:26px; flex-shrink:0; }
+  .mypage-name{ font-weight:800; font-size:15px; }
+  .mypage-sub{ font-size:11.5px; color:var(--ink-soft); }
+  .mypage-list{ padding:8px 4px; }
+  .mypage-row{
+    display:flex; align-items:center; gap:12px; padding:16px 14px; border-bottom:1px solid var(--line);
+    font-size:13.5px; font-weight:700; color:var(--ink); cursor:pointer;
+  }
+  .mypage-row .mr-icon{ font-size:19px; width:24px; text-align:center; flex-shrink:0; }
+  .mypage-row .mr-sub{ font-size:11px; font-weight:500; color:var(--ink-soft); margin-top:2px; }
+  .mypage-row .mr-chevron{ margin-left:auto; color:#bbb; font-size:18px; }
+  .mypage-row.disabled{ opacity:.45; cursor:default; }
+
+  .album-list{ display:flex; flex-direction:column; gap:14px; }
+  .album-card{ background:var(--panel); border:1.5px solid var(--line); border-radius:14px; padding:16px; box-shadow:var(--shadow); }
+  .album-card-top{ display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+  .album-card-top .ac-emoji{ font-size:28px; flex-shrink:0; }
+  .album-card-top .ac-title{ font-weight:800; font-size:13.5px; }
+  .album-card-top .ac-date{ font-size:11px; color:var(--ink-soft); }
+  .album-card-top .ac-price{ margin-left:auto; font-weight:800; color:var(--brand-dark); font-size:13px; white-space:nowrap; }
+  .album-tags{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+  .album-tag{ background:var(--gray-soft); color:var(--ink-soft); font-size:10.5px; font-weight:700; padding:3px 9px; border-radius:999px; }
+  .album-episode{ font-size:12.5px; color:var(--ink); margin-bottom:8px; }
+  .album-episode .ae-label{ font-weight:800; font-size:11px; color:var(--ink-soft); display:block; margin-bottom:2px; }
+  .album-empty{ text-align:center; padding:50px 20px; color:var(--ink-soft); font-size:12.5px; }
+</style>
+</head>
+<body>
+<div class="stage-bg">
+  <div class="phone-frame">
+    <div class="phone-notch"></div>
+    <div class="phone-inner">
+
+      <!-- ホーム画面（メルカリ風） -->
+      <section id="screen-home" class="screen active">
+        <div class="home-header">
+          <div class="mercari-wordmark">mercari</div>
+          <div class="search-bar">🔍 なにをお探しですか？</div>
+          <div class="bell-wrap">🔔<span class="bell-dot"></span></div>
+        </div>
+        <div class="home-scroll">
+          <div class="promo-banner" id="promo-banner">
+            <span class="pb-icon">🧹</span>
+            <span class="pb-text">そろそろ持ち物を整理しませんか？思い出を残しながら手放せます</span>
+            <span class="pb-chevron">›</span>
+          </div>
+          <div class="cat-chip-row">
+            <div class="cat-chip active">おすすめ</div>
+            <div class="cat-chip">レディース</div>
+            <div class="cat-chip">メンズ</div>
+            <div class="cat-chip">ベビー・キッズ</div>
+            <div class="cat-chip">家電</div>
+            <div class="cat-chip">スポーツ</div>
+          </div>
+          <div class="home-section-title">あなたへのおすすめ</div>
+          <div class="item-grid">
+            <div class="mock-item"><span class="mi-heart">♡</span><div class="mi-thumb">👕</div><div class="mi-name">古着 Tシャツ Lサイズ</div><div class="mi-price">¥1,500</div></div>
+            <div class="mock-item"><span class="mi-heart">♡</span><div class="mi-thumb">👟</div><div class="mi-name">スニーカー 26cm</div><div class="mi-price">¥3,200</div></div>
+            <div class="mock-item"><span class="mi-heart">♡</span><div class="mi-thumb">📚</div><div class="mi-name">小説 3冊セット</div><div class="mi-price">¥600</div></div>
+            <div class="mock-item"><span class="mi-heart">♡</span><div class="mi-thumb">🧴</div><div class="mi-name">未使用 化粧水</div><div class="mi-price">¥450</div></div>
+            <div class="mock-item"><span class="mi-heart">♡</span><div class="mi-thumb">⌚</div><div class="mi-name">腕時計 メンズ</div><div class="mi-price">¥5,000</div></div>
+            <div class="mock-item"><span class="mi-heart">♡</span><div class="mi-thumb">🧸</div><div class="mi-name">ぬいぐるみ</div><div class="mi-price">¥800</div></div>
+          </div>
+        </div>
+        <div class="tab-bar">
+          <button class="tab-item active"><span class="tab-icon">🏠</span>ホーム</button>
+          <button class="tab-item"><span class="tab-icon">🔍</span>検索</button>
+          <button class="tab-item tab-sell"><span class="tab-icon">📷</span>出品</button>
+          <button class="tab-item"><span class="tab-icon">🔔</span>お知らせ</button>
+          <button class="tab-item" id="tab-mypage"><span class="tab-icon">👤</span>マイページ</button>
+        </div>
+      </section>
+
+      <!-- 画面A: 条件入力 -->
+      <section id="screen-input" class="screen">
+        <div class="app-bar">
+          <button class="back-chevron" data-target="screen-home">‹</button>
+          <div class="app-bar-title">自分の部屋から探す</div>
+        </div>
+        <div class="screen-scroll">
+          <div class="card">
+            <h1 class="hero">今回の目標を教えてください</h1>
+            <p class="hero-sub">写真を1枚見せるだけで、AIが売却候補を見つけます。追加の撮影や入力は不要です。</p>
+
+            <div class="field">
+              <label class="field-label">目標金額</label>
+              <input type="number" id="input-target" class="yen-input" value="5000" step="500" min="0">
+              <div class="field-hint">円（未入力の場合は5,000円として計算します）</div>
+            </div>
+
+            <div class="field">
+              <label class="field-label">期限</label>
+              <div class="chip-row" data-group="deadline">
+                <div class="chip" data-value="today">今日中</div>
+                <div class="chip selected" data-value="this_week">今週中</div>
+                <div class="chip" data-value="flexible">急がない</div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="field-label">手間の許容度</label>
+              <div class="chip-row" data-group="effort">
+                <div class="chip selected" data-value="low">なるべく少なく</div>
+                <div class="chip" data-value="medium">普通</div>
+                <div class="chip" data-value="high">多少ならOK</div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="field-label">優先すること</label>
+              <div class="chip-row" data-group="priority">
+                <div class="chip selected" data-value="fast_cash">最短で稼ぐ</div>
+                <div class="chip" data-value="max_value">高く売る</div>
+                <div class="chip" data-value="declutter">部屋を片付ける</div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="field-label">部屋の写真</label>
+              <div class="photo-picker">
+                <div class="photo-thumb thumb-room1 selected" data-room="room1">
+                  <div class="thumb-label">デモ写真A</div>
+                </div>
+                <div class="photo-thumb thumb-room2" data-room="room2">
+                  <div class="thumb-label">デモ写真B</div>
+                </div>
+                <div class="upload-box" id="upload-box">
+                  <div>📷</div>
+                  <div>自分の写真</div>
+                </div>
+                <input type="file" id="file-input" accept="image/*">
+              </div>
+              <div class="field-hint">※プロトタイプでは、実際の写真に関わらず同じ売却候補シナリオでAR表示を再現します。</div>
+            </div>
+
+            <button class="cta" id="btn-analyze">この部屋を解析する</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ローディング -->
+      <section id="screen-loading" class="screen">
+        <div class="screen-scroll">
+          <div class="card">
+            <div class="spinner"></div>
+            <div id="loading-msg">写真を読み込み中...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 結果画面 -->
+      <section id="screen-result" class="screen">
+        <div class="app-bar">
+          <button class="back-chevron" data-target="screen-input">‹</button>
+          <div class="app-bar-title">売却プラン</div>
+        </div>
+        <div class="screen-scroll">
+          <div class="summary-bar">
+            <div class="summary-tile">
+              <div class="stile-label">この部屋の見込み</div>
+              <div class="stile-value" id="sum-total">¥0</div>
+            </div>
+            <div class="summary-tile" id="sum-tile-goal">
+              <div class="stile-label" id="sum-goal-label">目標まであと</div>
+              <div class="stile-value" id="sum-goal-value">¥0</div>
+            </div>
+          </div>
+
+          <div class="ar-stage" id="ar-stage" data-room="room1"></div>
+
+          <div class="legend">
+            <span><span class="dot recommended"></span>おすすめ</span>
+            <span><span class="dot caution"></span>条件次第</span>
+            <span><span class="dot do_not_suggest"></span>売却非推奨</span>
+          </div>
+
+          <div class="section-title">売却候補</div>
+          <div class="candidate-list" id="candidate-list"></div>
+
+          <div class="plan-box">
+            <div class="plan-title">目標達成プラン</div>
+            <div class="plan-total" id="plan-total">0点で約¥0</div>
+            <div class="plan-note" id="plan-note"></div>
+          </div>
+
+          <div class="back-row">
+            <button class="cta" id="btn-to-draft">このプランで出品する</button>
+            <button class="cta ghost" id="btn-back">条件を変更する</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 出品下書き画面 -->
+      <section id="screen-draft" class="screen">
+        <div class="app-bar">
+          <button class="back-chevron" data-target="screen-result">‹</button>
+          <div class="app-bar-title">商品の情報を入力</div>
+        </div>
+        <div class="screen-scroll">
+
+          <div id="draft-form">
+            <div class="progress-banner" id="draft-progress" hidden></div>
+
+            <div class="draft-photo" id="draft-photo">📦</div>
+
+            <div class="draft-field">
+              <label>商品名</label>
+              <input type="text" class="draft-input" id="draft-name">
+            </div>
+
+            <div class="draft-field">
+              <label>商品の説明</label>
+              <textarea class="draft-textarea" id="draft-desc"></textarea>
+            </div>
+
+            <div class="draft-static-row">
+              <span>カテゴリー</span>
+              <span class="dsr-value" id="draft-category">-</span>
+            </div>
+
+            <div class="draft-field" style="margin-top:16px;">
+              <label>商品の状態</label>
+              <div class="chip-row" data-group="condition">
+                <div class="chip" data-value="new">新品、未使用</div>
+                <div class="chip" data-value="like_new">未使用に近い</div>
+                <div class="chip selected" data-value="good">目立った傷や汚れなし</div>
+                <div class="chip" data-value="fair">やや傷や汚れあり</div>
+                <div class="chip" data-value="poor">全体的に状態が悪い</div>
+              </div>
+            </div>
+
+            <div class="draft-static-row">
+              <span>配送料の負担</span>
+              <span class="dsr-value">出品者（自分）負担</span>
+            </div>
+            <div class="draft-static-row">
+              <span>配送の方法</span>
+              <span class="dsr-value">らくらくメルカリ便</span>
+            </div>
+
+            <div class="draft-field" style="margin-top:18px;">
+              <label>販売価格</label>
+              <div class="draft-price-wrap">
+                <span>¥</span>
+                <input type="number" id="draft-price" step="100" min="0">
+              </div>
+              <div class="fee-row"><span>販売手数料（10%）</span><span id="draft-fee">¥0</span></div>
+              <div class="fee-row profit"><span>販売利益</span><span id="draft-profit">¥0</span></div>
+            </div>
+
+            <button class="cta" id="btn-draft-submit">出品する</button>
+          </div>
+
+          <div class="draft-success" id="draft-success" hidden>
+            <div class="ds-icon">🎉</div>
+            <div class="ds-title" id="draft-success-title">出品が完了しました</div>
+            <div class="ds-sub">※プロトタイプのため、実際の出品は行われません。</div>
+            <div id="draft-next-actions"></div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 思い出ベース手放し判断支援: 目的設定 -->
+      <section id="screen-declutter-intro" class="screen">
+        <div class="app-bar">
+          <button class="back-chevron" data-target="screen-home">‹</button>
+          <div class="app-bar-title">持ち物を整理する</div>
+        </div>
+        <div class="screen-scroll">
+          <div class="card">
+            <h1 class="hero">整理する目的を教えてください</h1>
+            <p class="hero-sub">迷う物だけ、あとでAIと一緒に短く整理します。売るか残すかは、いつでもあなたが決められます。</p>
+
+            <div class="field">
+              <label class="field-label">目標金額（任意）</label>
+              <input type="number" id="declutter-target" class="yen-input" value="10000" step="500" min="0">
+              <div class="field-hint">円（未入力の場合は10,000円として計算します）</div>
+            </div>
+
+            <div class="field">
+              <label class="field-label">今回の目的</label>
+              <div class="chip-row" data-group="declutter-purpose">
+                <div class="chip" data-value="declutter">部屋を片付けたい</div>
+                <div class="chip" data-value="hobby_cleanup">趣味整理</div>
+                <div class="chip selected" data-value="graduation">卒業・引越し</div>
+                <div class="chip" data-value="other">その他</div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="field-label">整理する場所の写真</label>
+              <div class="photo-picker" id="declutter-photo-picker">
+                <div class="photo-thumb-d thumb-room1 selected">
+                  <div class="thumb-label">デモ写真A</div>
+                </div>
+                <div class="photo-thumb-d thumb-room2">
+                  <div class="thumb-label">デモ写真B</div>
+                </div>
+              </div>
+              <div class="field-hint">※プロトタイプでは、写真に関わらず同じ4点の商品候補を抽出します。</div>
+            </div>
+
+            <button class="cta" id="btn-declutter-start">商品候補を抽出する</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 抽出中ローディング -->
+      <section id="screen-declutter-loading" class="screen">
+        <div class="screen-scroll">
+          <div class="card">
+            <div class="spinner"></div>
+            <div id="declutter-loading-msg">写真を読み込み中...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 高速仕分け -->
+      <section id="screen-declutter-deck" class="screen">
+        <div class="app-bar">
+          <button class="back-chevron" data-target="screen-declutter-intro">‹</button>
+          <div class="app-bar-title">直感で仕分けよう</div>
+        </div>
+        <div class="screen-scroll">
+          <div class="deck-progress" id="deck-progress">1 / 4</div>
+          <div class="deck-stage" id="deck-stage"></div>
+          <div class="deck-buttons">
+            <button class="deck-btn keep" id="deck-btn-keep"><span class="db-icon">◀</span>残したい</button>
+            <button class="deck-btn unsure" id="deck-btn-unsure"><span class="db-icon">🤔</span>迷う</button>
+            <button class="deck-btn release" id="deck-btn-release"><span class="db-icon">▶</span>手放せそう</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 迷い対話 -->
+      <section id="screen-declutter-dialogue" class="screen">
+        <div class="app-bar">
+          <button class="back-chevron" data-target="screen-declutter-deck">‹</button>
+          <div class="app-bar-title">少しだけ質問させてください</div>
+        </div>
+        <div class="screen-scroll">
+          <div class="progress-banner" id="dialogue-progress" hidden></div>
+          <div class="chat-item-header">
+            <span class="cih-emoji" id="dialogue-emoji"></span>
+            <span class="cih-name" id="dialogue-name"></span>
+          </div>
+          <div class="chat-log" id="chat-log"></div>
+          <div class="chat-choices" id="chat-choices"></div>
+          <div class="decision-row" id="decision-row" hidden>
+            <button class="decision-btn sell" data-decision="sell">売る</button>
+            <button class="decision-btn keep" data-decision="keep">残す</button>
+            <button class="decision-btn hold" data-decision="hold">今は保留</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 最終整理 -->
+      <section id="screen-declutter-final" class="screen">
+        <div class="app-bar">
+          <button class="back-chevron" data-target="screen-declutter-deck">‹</button>
+          <div class="app-bar-title">最終確認</div>
+        </div>
+        <div class="screen-scroll">
+          <p class="hero-sub">AIの言葉はあくまで判断材料です。最終的な決定はいつでも変更できます。</p>
+          <div class="final-list" id="final-list"></div>
+          <button class="cta" id="btn-to-plan">売却プランを見る</button>
+        </div>
+      </section>
+
+      <!-- 売却プラン -->
+      <section id="screen-declutter-plan" class="screen">
+        <div class="app-bar">
+          <button class="back-chevron" data-target="screen-declutter-final">‹</button>
+          <div class="app-bar-title">売却プラン</div>
+        </div>
+        <div class="screen-scroll">
+          <div class="summary-bar">
+            <div class="summary-tile">
+              <div class="stile-label">売ると決めた合計</div>
+              <div class="stile-value" id="plan2-total">¥0</div>
+            </div>
+            <div class="summary-tile" id="plan2-tile-goal">
+              <div class="stile-label" id="plan2-goal-label">目標まであと</div>
+              <div class="stile-value" id="plan2-goal-value">¥0</div>
+            </div>
+          </div>
+          <div class="candidate-list" id="plan2-list"></div>
+          <button class="cta" id="btn-to-memo" style="margin-top:20px;">出品メモを作成する</button>
+        </div>
+      </section>
+
+      <!-- 出品メモ作成 -->
+      <section id="screen-declutter-memo" class="screen">
+        <div class="app-bar">
+          <button class="back-chevron" data-target="screen-declutter-plan">‹</button>
+          <div class="app-bar-title">エピソードを残す</div>
+        </div>
+        <div class="screen-scroll">
+          <div id="memo-form">
+            <div class="progress-banner" id="memo-progress" hidden></div>
+            <div class="draft-photo" id="memo-photo">📦</div>
+
+            <div class="draft-field">
+              <label>商品名</label>
+              <input type="text" class="draft-input" id="memo-name">
+            </div>
+
+            <div class="draft-field">
+              <label>売却価格</label>
+              <div class="draft-price-wrap"><span>¥</span><input type="number" id="memo-price" step="100" min="0"></div>
+            </div>
+
+            <div class="draft-field">
+              <label>この物にまつわるエピソード</label>
+              <textarea class="draft-textarea" id="memo-episode" placeholder="いつ、どうやって手に入れた物ですか？一番の思い出は？"></textarea>
+            </div>
+
+            <div class="draft-field">
+              <label>手放す理由</label>
+              <textarea class="draft-textarea" id="memo-reason" placeholder="今回手放そうと思った理由を書いてみましょう"></textarea>
+            </div>
+
+            <div class="draft-field">
+              <label>タグ</label>
+              <div class="tag-chip-row" id="memo-tags">
+                <div class="tag-chip" data-value="サークル">サークル</div>
+                <div class="tag-chip" data-value="推し活">推し活</div>
+                <div class="tag-chip" data-value="教科書">教科書</div>
+                <div class="tag-chip" data-value="卒業">卒業</div>
+                <div class="tag-chip" data-value="引越し">引越し</div>
+                <div class="tag-chip" data-value="趣味整理">趣味整理</div>
+              </div>
+            </div>
+
+            <button class="cta" id="btn-memo-save">アルバムに保存する</button>
+          </div>
+
+          <div class="draft-success" id="memo-success" hidden>
+            <div class="ds-icon">📔</div>
+            <div class="ds-title" id="memo-success-title">アルバムに保存しました</div>
+            <div class="ds-sub">物は手放しても、記憶はメルカリに残ります。</div>
+            <div id="memo-next-actions"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- マイページ -->
+      <section id="screen-mypage" class="screen">
+        <div class="app-bar">
+          <button class="back-chevron" data-target="screen-home">‹</button>
+          <div class="app-bar-title">マイページ</div>
+        </div>
+        <div class="mypage-header">
+          <div class="mypage-avatar">🙂</div>
+          <div>
+            <div class="mypage-name">ゲストユーザー</div>
+            <div class="mypage-sub">プロトタイプ用アカウント</div>
+          </div>
+        </div>
+        <div class="mypage-list">
+          <div class="mypage-row disabled">
+            <span class="mr-icon">🧾</span>
+            <span>購入履歴</span>
+            <span class="mr-chevron">›</span>
+          </div>
+          <div class="mypage-row" id="row-album">
+            <span class="mr-icon">📔</span>
+            <div>
+              出品履歴・思い出を見る
+              <div class="mr-sub">手放したもののアルバム</div>
+            </div>
+            <span class="mr-chevron">›</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 手放したもののアルバム -->
+      <section id="screen-album" class="screen">
+        <div class="app-bar">
+          <button class="back-chevron" data-target="screen-mypage">‹</button>
+          <div class="app-bar-title">手放したもののアルバム</div>
+        </div>
+        <div class="screen-scroll">
+          <p class="hero-sub">物は手放しても、思い出はここに残ります。</p>
+          <div class="album-list" id="album-list"></div>
+        </div>
+      </section>
+
+      <!-- 出品方法シート -->
+      <div class="sheet-backdrop" id="sheet-backdrop"></div>
+      <div class="sheet" id="listing-sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">出品する商品を追加</div>
+        <button class="sheet-option" disabled>📷&nbsp;&nbsp;写真を撮る</button>
+        <button class="sheet-option" disabled>🖼️&nbsp;&nbsp;アルバムから選ぶ</button>
+        <button class="sheet-option sheet-option-new" id="btn-open-room-search">🏠&nbsp;&nbsp;自分の部屋から探す<span class="new-badge">NEW</span></button>
+        <button class="sheet-option sheet-option-new" id="btn-open-declutter">🧠&nbsp;&nbsp;思い出を整理して手放す<span class="new-badge">NEW</span></button>
+        <button class="sheet-cancel" id="btn-sheet-cancel">キャンセル</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+
+  var CANDIDATES = [
+    {
+      id: "earphones", name: "ワイヤレスイヤホン", emoji: "🎧",
+      category: "家電・スマホ・カメラ > イヤホン",
+      priceLow: 2000, priceHigh: 4000,
+      sellability: 5, effort: 1, bulk: 1,
+      safetyStatus: "recommended",
+      reason: "人気カテゴリで需要が安定。梱包も小さく発送しやすい。",
+      pos: { room1: {x:15, y:75}, room2: {x:50, y:20}, custom: {x:18, y:30} }
+    },
+    {
+      id: "game_soft", name: "ゲームソフト（3本セット）", emoji: "🎮",
+      category: "本・音楽・ゲーム > テレビゲーム",
+      priceLow: 1500, priceHigh: 3000,
+      sellability: 4, effort: 1, bulk: 1,
+      safetyStatus: "recommended",
+      reason: "小型で送料が安く、需要が安定しているカテゴリ。",
+      pos: { room1: {x:83, y:28}, room2: {x:50, y:85}, custom: {x:50, y:22} }
+    },
+    {
+      id: "bag", name: "トートバッグ", emoji: "👜",
+      category: "レディース > バッグ",
+      priceLow: 1000, priceHigh: 2000,
+      sellability: 3, effort: 2, bulk: 3,
+      safetyStatus: "recommended",
+      reason: "状態が良ければ手放しやすく、部屋のスペースも空く。",
+      pos: { room1: {x:50, y:82}, room2: {x:15, y:75}, custom: {x:82, y:30} }
+    },
+    {
+      id: "switch", name: "Nintendo Switch本体", emoji: "🕹️",
+      category: "本・音楽・ゲーム > テレビゲーム本体",
+      priceLow: 18000, priceHigh: 23000,
+      sellability: 5, effort: 3, bulk: 1,
+      safetyStatus: "recommended",
+      reason: "高単価だが、動作確認や付属品の確認に少し手間がかかる。",
+      pos: { room1: {x:50, y:18}, room2: {x:83, y:78}, custom: {x:18, y:75} }
+    },
+    {
+      id: "camera", name: "コンパクトデジタルカメラ", emoji: "📷",
+      category: "家電・スマホ・カメラ > カメラ",
+      priceLow: 3000, priceHigh: 8000,
+      sellability: 2, effort: 4, bulk: 1,
+      safetyStatus: "caution",
+      reason: "型番・動作確認が必要で、査定にやや時間がかかる可能性。",
+      pos: { room1: {x:15, y:30}, room2: {x:83, y:25}, custom: {x:50, y:82} }
+    },
+    {
+      id: "school_cloth", name: "学校名入りジャージ", emoji: "👕",
+      priceLow: 0, priceHigh: 0,
+      sellability: 1, effort: 1, bulk: 2,
+      safetyStatus: "do_not_suggest",
+      reason: "学校名入り：身元特定や誤用につながるおそれがあり、一般売却は非推奨。",
+      alternative: "素材回収や記念保管を検討しましょう。",
+      pos: { room1: {x:83, y:72}, room2: {x:15, y:28}, custom: {x:82, y:75} }
+    }
+  ];
+
+  var state = {
+    goal: { targetYen: 5000, deadline: "this_week", effortTolerance: "low", priority: "fast_cash" },
+    room: "room1",
+    customImage: null,
+    included: {},
+    sortedIds: [],
+    draftQueue: [],
+    draftIndex: 0,
+    declutter: {
+      targetYen: 10000,
+      purpose: "graduation",
+      classifications: {},
+      finalDecisions: {},
+      dialogueAnswers: {},
+      dialogueSummaries: {},
+      qIndex: 0,
+      deckIndex: 0,
+      unsureQueue: [],
+      unsureIndex: 0,
+      memoQueue: [],
+      memoIndex: 0
+    }
+  };
+
+  function $(sel, root){ return (root||document).querySelector(sel); }
+  function $all(sel, root){ return Array.prototype.slice.call((root||document).querySelectorAll(sel)); }
+
+  function showScreen(id){
+    $all(".screen").forEach(function(s){ s.classList.remove("active"); });
+    $("#"+id).classList.add("active");
+  }
+
+  // --- 出品方法シート ---
+  function openSheet(){
+    $("#sheet-backdrop").classList.add("open");
+    $("#listing-sheet").classList.add("open");
+  }
+  function closeSheet(){
+    $("#sheet-backdrop").classList.remove("open");
+    $("#listing-sheet").classList.remove("open");
+  }
+  $(".tab-sell").addEventListener("click", openSheet);
+  $("#sheet-backdrop").addEventListener("click", closeSheet);
+  $("#btn-sheet-cancel").addEventListener("click", closeSheet);
+  $("#btn-open-room-search").addEventListener("click", function(){
+    closeSheet();
+    showScreen("screen-input");
+  });
+  $("#btn-open-declutter").addEventListener("click", function(){
+    closeSheet();
+    showScreen("screen-declutter-intro");
+  });
+  $("#promo-banner").addEventListener("click", function(){
+    showScreen("screen-declutter-intro");
+  });
+  $("#tab-mypage").addEventListener("click", function(){
+    showScreen("screen-mypage");
+  });
+  $("#row-album").addEventListener("click", function(){
+    renderAlbum();
+    showScreen("screen-album");
+  });
+
+  // --- 画面遷移（戻る） ---
+  $all(".back-chevron").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      showScreen(btn.dataset.target);
+    });
+  });
+
+  // --- 条件入力: チップ選択 ---
+  $all(".chip-row").forEach(function(row){
+    row.addEventListener("click", function(e){
+      var chip = e.target.closest(".chip");
+      if(!chip) return;
+      $all(".chip", row).forEach(function(c){ c.classList.remove("selected"); });
+      chip.classList.add("selected");
+    });
+  });
+
+  function selectedValue(group, root){
+    var row = $('.chip-row[data-group="'+group+'"]', root);
+    var chip = $(".chip.selected", row);
+    return chip ? chip.dataset.value : null;
+  }
+
+  // --- 写真選択 ---
+  $all(".photo-thumb").forEach(function(thumb){
+    thumb.addEventListener("click", function(){
+      $all(".photo-thumb").forEach(function(t){ t.classList.remove("selected"); });
+      $("#upload-box").classList.remove("selected");
+      thumb.classList.add("selected");
+      state.room = thumb.dataset.room;
+      state.customImage = null;
+    });
+  });
+
+  // 思い出整理フローの写真選択は見た目だけの独立コンポーネント（既存の #app.room 状態には影響しない）
+  $all(".photo-thumb-d", $("#declutter-photo-picker")).forEach(function(t){
+    t.addEventListener("click", function(){
+      $all(".photo-thumb-d", $("#declutter-photo-picker")).forEach(function(x){ x.classList.remove("selected"); });
+      t.classList.add("selected");
+    });
+  });
+
+  $("#upload-box").addEventListener("click", function(){
+    $("#file-input").click();
+  });
+
+  $("#file-input").addEventListener("change", function(e){
+    var file = e.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      state.customImage = ev.target.result;
+      state.room = "custom";
+      $all(".photo-thumb").forEach(function(t){ t.classList.remove("selected"); });
+      $("#upload-box").classList.add("selected");
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // --- 解析開始 ---
+  $("#btn-analyze").addEventListener("click", function(){
+    state.goal.targetYen = parseInt($("#input-target").value, 10) || 5000;
+    state.goal.deadline = selectedValue("deadline");
+    state.goal.effortTolerance = selectedValue("effort");
+    state.goal.priority = selectedValue("priority");
+
+    runLoading();
+  });
+
+  var LOADING_MESSAGES = [
+    "写真を読み込み中...",
+    "写真内の物を検出中...",
+    "価格相場と照合中...",
+    "手間・売れやすさを評価中...",
+    "安全性を確認中...",
+    "目標に合わせて候補を並べ替え中..."
+  ];
+
+  function runLoading(){
+    showScreen("screen-loading");
+    var i = 0;
+    $("#loading-msg").textContent = LOADING_MESSAGES[0];
+    var timer = setInterval(function(){
+      i++;
+      if(i >= LOADING_MESSAGES.length){
+        clearInterval(timer);
+        renderResult();
+        showScreen("screen-result");
+        return;
+      }
+      $("#loading-msg").textContent = LOADING_MESSAGES[i];
+    }, 380);
+  }
+
+  $("#btn-back").addEventListener("click", function(){
+    showScreen("screen-input");
+  });
+
+  // --- スコアリング ---
+  // 手間の許容度でまず「層」を分け、層の中で優先軸に沿って並べる。
+  // 「手間をかけたくない」なら、高額でも手間の大きい物より先に低負担の物を検討する。
+  function midPrice(c){ return (c.priceLow + c.priceHigh) / 2; }
+
+  function effortTier(effort, effortTolerance){
+    if(effortTolerance === "low") return effort <= 2 ? 0 : (effort === 3 ? 1 : 2);
+    if(effortTolerance === "medium") return effort <= 3 ? 0 : 1;
+    return 0;
+  }
+
+  function priorityScore(c, goal){
+    if(goal.priority === "max_value") return c.priceHigh;
+    if(goal.priority === "declutter") return c.bulk * 100000 + midPrice(c);
+    return midPrice(c) * c.sellability; // fast_cash（既定）
+  }
+
+  function compareCandidates(a, b, goal){
+    var tierDiff = effortTier(a.effort, goal.effortTolerance) - effortTier(b.effort, goal.effortTolerance);
+    if(tierDiff !== 0) return tierDiff;
+    if(goal.deadline === "today" && a.sellability !== b.sellability){
+      return b.sellability - a.sellability;
+    }
+    return priorityScore(b, goal) - priorityScore(a, goal);
+  }
+
+  function buildPlan(sortedCandidates, goal){
+    var planIds = [];
+    var sum = 0;
+    for(var i=0; i<sortedCandidates.length; i++){
+      if(sum >= goal.targetYen) break;
+      planIds.push(sortedCandidates[i].id);
+      sum += midPrice(sortedCandidates[i]);
+    }
+    if(planIds.length === 0 && sortedCandidates.length > 0){
+      planIds.push(sortedCandidates[0].id);
+    }
+    return planIds;
+  }
+
+  function effortLabel(v){ return v <= 2 ? "低" : (v === 3 ? "中" : "高"); }
+  function yen(n){ return "¥" + Math.round(n).toLocaleString("ja-JP"); }
+
+  function renderResult(){
+    var goal = state.goal;
+
+    var sellable = CANDIDATES.filter(function(c){ return c.safetyStatus !== "do_not_suggest"; });
+    var blocked = CANDIDATES.filter(function(c){ return c.safetyStatus === "do_not_suggest"; });
+
+    sellable.sort(function(a,b){ return compareCandidates(a, b, goal); });
+    state.sortedIds = sellable.map(function(c){ return c.id; });
+
+    var defaultPlanIds = buildPlan(sellable, goal);
+    state.included = {};
+    defaultPlanIds.forEach(function(id){ state.included[id] = true; });
+
+    var ordered = sellable.concat(blocked);
+
+    // AR stage
+    var stage = $("#ar-stage");
+    stage.innerHTML = "";
+    stage.dataset.room = state.room;
+    if(state.room === "custom" && state.customImage){
+      stage.style.backgroundImage = "url(" + state.customImage + ")";
+    } else {
+      stage.style.backgroundImage = "";
+      var decorA = document.createElement("div");
+      decorA.className = "decor decor-couch";
+      var decorB = document.createElement("div");
+      decorB.className = "decor decor-rug";
+      var decorC = document.createElement("div");
+      decorC.className = "decor decor-shelf";
+      var decorD = document.createElement("div");
+      decorD.className = "decor decor-bed";
+      var decorE = document.createElement("div");
+      decorE.className = "decor decor-desk";
+      stage.appendChild(decorA);
+      stage.appendChild(decorB);
+      stage.appendChild(decorC);
+      stage.appendChild(decorD);
+      stage.appendChild(decorE);
+    }
+
+    ordered.forEach(function(c){
+      var pos = c.pos[state.room] || c.pos.custom;
+      var marker = document.createElement("div");
+      marker.className = "item-marker";
+      marker.style.left = pos.x + "%";
+      marker.style.top = pos.y + "%";
+      marker.dataset.id = c.id;
+
+      var emojiEl = document.createElement("div");
+      emojiEl.className = "item-emoji";
+      emojiEl.textContent = c.emoji;
+
+      var chip = document.createElement("div");
+      chip.className = "price-chip " + c.safetyStatus;
+      chip.textContent = c.safetyStatus === "do_not_suggest" ? "非推奨" : (yen(c.priceLow) + "〜" + yen(c.priceHigh));
+
+      marker.appendChild(emojiEl);
+      marker.appendChild(chip);
+      marker.addEventListener("click", function(){ highlightCandidate(c.id); });
+      stage.appendChild(marker);
+    });
+
+    // カード一覧
+    var list = $("#candidate-list");
+    list.innerHTML = "";
+    ordered.forEach(function(c){
+      var card = document.createElement("div");
+      card.className = "candidate-card";
+      card.dataset.id = c.id;
+
+      var badgeText = c.safetyStatus === "recommended" ? "おすすめ" : (c.safetyStatus === "caution" ? "条件次第" : "売却非推奨");
+
+      card.innerHTML =
+        '<div class="cc-emoji">' + c.emoji + '</div>' +
+        '<div class="cc-body">' +
+          '<div class="cc-top">' +
+            '<span class="cc-name">' + c.name + '</span>' +
+            (c.safetyStatus === "do_not_suggest" ? '' : '<span class="cc-price">' + yen(c.priceLow) + '〜' + yen(c.priceHigh) + '</span>') +
+          '</div>' +
+          '<div class="cc-meta">' +
+            '<span class="badge ' + c.safetyStatus + '">' + badgeText + '</span>' +
+            (c.safetyStatus !== "do_not_suggest" ? '<span>売れやすさ ' + "★".repeat(c.sellability) + "☆".repeat(5-c.sellability) + '</span>' : '') +
+            (c.safetyStatus !== "do_not_suggest" ? '<span>手間: ' + effortLabel(c.effort) + '</span>' : '') +
+          '</div>' +
+          '<div class="cc-reason">' + c.reason + '</div>' +
+          (c.alternative ? '<div class="cc-alt">代替案：' + c.alternative + '</div>' : '') +
+        '</div>' +
+        '<div class="cc-toggle-wrap">' +
+          '<input type="checkbox" class="cc-toggle" data-id="' + c.id + '" ' +
+            (c.safetyStatus === "do_not_suggest" ? "disabled" : (state.included[c.id] ? "checked" : "")) +
+          '>' +
+        '</div>';
+
+      list.appendChild(card);
+    });
+
+    $all(".cc-toggle").forEach(function(box){
+      box.addEventListener("change", function(){
+        state.included[box.dataset.id] = box.checked;
+        updateTotals();
+      });
+    });
+
+    updateTotals();
+  }
+
+  function highlightCandidate(id){
+    $all(".item-marker").forEach(function(m){ m.classList.toggle("highlight", m.dataset.id === id); });
+    $all(".candidate-card").forEach(function(c){ c.classList.toggle("highlight", c.dataset.id === id); });
+    var card = $('.candidate-card[data-id="' + id + '"]');
+    if(card) card.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function updateTotals(){
+    var totalLow = 0, totalHigh = 0, count = 0;
+    CANDIDATES.forEach(function(c){
+      if(state.included[c.id]){
+        totalLow += c.priceLow;
+        totalHigh += c.priceHigh;
+        count++;
+      }
+    });
+    var totalMid = (totalLow + totalHigh) / 2;
+    var target = state.goal.targetYen;
+    var shortfall = target - totalMid;
+
+    $("#sum-total").textContent = yen(totalLow) + "〜" + yen(totalHigh);
+
+    var goalTile = $("#sum-tile-goal");
+    var goalLabel = $("#sum-goal-label");
+    var goalValue = $("#sum-goal-value");
+    if(shortfall > 0){
+      goalTile.className = "summary-tile warn";
+      goalLabel.textContent = "目標まであと";
+      goalValue.textContent = yen(shortfall);
+    } else {
+      goalTile.className = "summary-tile done";
+      goalLabel.textContent = "目標達成";
+      goalValue.textContent = yen(totalMid);
+    }
+
+    $("#plan-total").textContent = count + "点で約" + yen(totalLow) + "〜" + yen(totalHigh);
+    $("#plan-note").textContent = shortfall > 0
+      ? "目標の" + yen(target) + "まであと" + yen(shortfall) + "ほど足りません。候補のチェックを増やしてみましょう。"
+      : "目標の" + yen(target) + "を達成できる組み合わせです。";
+
+    $("#btn-to-draft").disabled = count === 0;
+  }
+
+  // --- 出品下書き画面 ---
+  $("#btn-to-draft").addEventListener("click", function(){
+    state.draftQueue = state.sortedIds.filter(function(id){ return state.included[id]; });
+    if(state.draftQueue.length === 0) return;
+    state.draftIndex = 0;
+    renderDraft();
+    showScreen("screen-draft");
+  });
+
+  function findCandidate(id){
+    for(var i=0; i<CANDIDATES.length; i++){ if(CANDIDATES[i].id === id) return CANDIDATES[i]; }
+    return null;
+  }
+
+  function updateFee(){
+    var price = parseInt($("#draft-price").value, 10) || 0;
+    var fee = Math.floor(price * 0.1);
+    $("#draft-fee").textContent = yen(fee);
+    $("#draft-profit").textContent = yen(price - fee);
+  }
+  $("#draft-price").addEventListener("input", updateFee);
+
+  function renderDraft(){
+    var c = findCandidate(state.draftQueue[state.draftIndex]);
+    if(!c) return;
+
+    $("#draft-form").hidden = false;
+    $("#draft-success").hidden = true;
+
+    var progress = $("#draft-progress");
+    if(state.draftQueue.length > 1){
+      progress.hidden = false;
+      progress.textContent = "目標達成プランのうち " + (state.draftIndex + 1) + " / " + state.draftQueue.length + " 件目の下書きです";
+    } else {
+      progress.hidden = true;
+    }
+
+    $("#draft-photo").textContent = c.emoji;
+    $("#draft-name").value = c.name;
+    $("#draft-desc").value = c.reason + "\n\n※AIによる自動生成の下書きです。実際の商品状態に合わせて編集してください。";
+    $("#draft-category").textContent = c.category || "-";
+
+    $all('.chip-row[data-group="condition"] .chip').forEach(function(chip){
+      chip.classList.toggle("selected", chip.dataset.value === "good");
+    });
+
+    var price = Math.round(midPrice(c) / 100) * 100;
+    $("#draft-price").value = price;
+    updateFee();
+  }
+
+  $("#btn-draft-submit").addEventListener("click", function(){
+    var c = findCandidate(state.draftQueue[state.draftIndex]);
+    var condition = selectedValue("condition") || "目立った傷や汚れなし";
+    var conditionLabels = { new:"新品、未使用", like_new:"未使用に近い", good:"目立った傷や汚れなし", fair:"やや傷や汚れあり", poor:"全体的に状態が悪い" };
+
+    $("#draft-form").hidden = true;
+    $("#draft-success").hidden = false;
+    $("#draft-success-title").textContent = "「" + c.name + "」の出品が完了しました";
+
+    var remaining = state.draftQueue.length - state.draftIndex - 1;
+    var actions = $("#draft-next-actions");
+    actions.innerHTML = "";
+
+    if(remaining > 0){
+      var nextBtn = document.createElement("button");
+      nextBtn.className = "cta";
+      nextBtn.textContent = "次の商品を出品する（残り" + remaining + "件）";
+      nextBtn.addEventListener("click", function(){
+        state.draftIndex++;
+        renderDraft();
+      });
+      actions.appendChild(nextBtn);
+    }
+
+    var homeBtn = document.createElement("button");
+    homeBtn.className = "cta ghost";
+    homeBtn.style.marginTop = remaining > 0 ? "10px" : "0";
+    homeBtn.textContent = "ホームに戻る";
+    homeBtn.addEventListener("click", function(){
+      showScreen("screen-home");
+    });
+    actions.appendChild(homeBtn);
+  });
+
+  // ================================================================
+  // 思い出ベースの手放し判断支援
+  // ================================================================
+
+  var GENERIC_DIALOGUE = [
+    { q: "この物そのものに愛着がありますか。それとも、その物に紐づく出来事を残したいですか？", choices: ["物そのものに愛着がある", "紐づく出来事を残したい", "正直あまり思い入れはない"] },
+    { q: "最近使いましたか。半年後に使う具体的な場面は想像できますか？", choices: ["最近も使っている", "もう使う予定はない", "分からない"] },
+    { q: "同じ役割の物はほかにありますか。残すなら、これが代表の1つである必要はありますか？", choices: ["代わりになる物がある", "これでないと意味がない", "特に代わりはない"] }
+  ];
+
+  var DECLUTTER_ITEMS = [
+    {
+      id: "tshirt", name: "サークルTシャツ", emoji: "👕", estimatedPrice: 800,
+      dialogue: [
+        { q: "この物そのものに愛着がありますか。それとも、その物に紐づく出来事を残したいですか？", choices: ["物そのものに愛着がある", "出来事や思い出を残したい", "どちらも少しずつある"] },
+        { q: "この物で一番覚えていることは何ですか？", choices: ["最後の大会で着たこと", "仲間からの寄せ書きがあること", "特に強い記憶はない"] },
+        { q: "最近使いましたか。半年後に使う具体的な場面は想像できますか？", choices: ["もう着る予定はない", "たまに部屋着として着る", "分からない"] }
+      ],
+      summary: "このTシャツは最後の大会で着た記念性が大きく、実用品として使う予定は低そうです。一方で、寄せ書きなど物自体に固有の思い出も残っているため、「出来事を残したい」気持ちは他の形でも満たせるかもしれません。残すなら代表として1枚、手放すならこのエピソードをアルバムに残してから、という判断が考えられます。"
+    },
+    { id: "textbook", name: "教科書セット", emoji: "📚", estimatedPrice: 600 },
+    { id: "figure", name: "推しフィギュア", emoji: "🎎", estimatedPrice: 3500 },
+    { id: "headphones", name: "普段使いのヘッドホン", emoji: "🎧", estimatedPrice: 2500 }
+  ];
+
+  var ALBUM = [
+    {
+      id: "seed1", title: "文化祭で使ったハッピ", emoji: "🥻",
+      listedAt: "2026-03-02", soldAt: "2026-03-05", soldPrice: 1200,
+      episode: "文化祭の実行委員をしていたときに着ていたお揃いのハッピです。",
+      lettingGoReason: "もう着る機会はないけれど、必要としてくれる後輩に譲りたくて出品しました。",
+      tags: ["卒業", "趣味整理"]
+    }
+  ];
+
+  function findDeclutterItem(id){
+    for(var i=0; i<DECLUTTER_ITEMS.length; i++){ if(DECLUTTER_ITEMS[i].id === id) return DECLUTTER_ITEMS[i]; }
+    return null;
+  }
+
+  function buildSummary(item, answers){
+    if(item.summary) return item.summary;
+    var usagePart = answers[1] === "最近も使っている"
+      ? "実用面では今も使っている状況です。"
+      : (answers[1] === "もう使う予定はない" ? "実用面では今後使う場面は想像しにくいようです。" : "実用面では使うかどうか、まだ判断しきれていないようです。");
+    var attachPart = answers[0] === "紐づく出来事を残したい"
+      ? "物そのものより、紐づく出来事に価値を感じているようです。写真やメモなど別の形で思い出を残す選択肢もあります。"
+      : (answers[0] === "正直あまり思い入れはない" ? "思い入れはそれほど強くなさそうです。" : "物そのものにも一定の愛着があるようです。");
+    var altPart = answers[2] === "代わりになる物がある"
+      ? "代わりになる物もあるため、これでなければならない理由は薄いかもしれません。"
+      : (answers[2] === "これでないと意味がない" ? "代わりが利かない理由があるようなので、その点は残す判断の材料になりそうです。" : "");
+    return usagePart + attachPart + altPart + " 最終的な判断はあなた自身で選んでください。";
+  }
+
+  // --- 目的設定 ---
+  $("#btn-declutter-start").addEventListener("click", function(){
+    state.declutter.targetYen = parseInt($("#declutter-target").value, 10) || 10000;
+    state.declutter.purpose = selectedValue("declutter-purpose");
+    state.declutter.classifications = {};
+    state.declutter.finalDecisions = {};
+    state.declutter.dialogueAnswers = {};
+    state.declutter.dialogueSummaries = {};
+    state.declutter.deckIndex = 0;
+    runDeclutterLoading();
+  });
+
+  var DECLUTTER_LOADING_MESSAGES = [
+    "写真を読み込み中...",
+    "棚の中の物を検出中...",
+    "商品候補カードを作成中..."
+  ];
+
+  function runDeclutterLoading(){
+    showScreen("screen-declutter-loading");
+    var i = 0;
+    $("#declutter-loading-msg").textContent = DECLUTTER_LOADING_MESSAGES[0];
+    var timer = setInterval(function(){
+      i++;
+      if(i >= DECLUTTER_LOADING_MESSAGES.length){
+        clearInterval(timer);
+        renderDeck();
+        showScreen("screen-declutter-deck");
+        return;
+      }
+      $("#declutter-loading-msg").textContent = DECLUTTER_LOADING_MESSAGES[i];
+    }, 380);
+  }
+
+  // --- 高速仕分け ---
+  function buildDeckCardEl(item, interactive){
+    var el = document.createElement("div");
+    el.className = "deck-card" + (interactive ? "" : " next-peek");
+    el.innerHTML =
+      '<div class="dc-stamp keep">残す</div>' +
+      '<div class="dc-stamp release">手放す</div>' +
+      '<div class="dc-emoji">' + item.emoji + '</div>' +
+      '<div class="dc-name">' + item.name + '</div>' +
+      '<div class="dc-price">推定 ' + yen(item.estimatedPrice) + '</div>';
+    return el;
+  }
+
+  function attachSwipe(el){
+    var startX = 0, startY = 0, curX = 0, curY = 0, dragging = false;
+    var keepStamp = el.querySelector(".dc-stamp.keep");
+    var releaseStamp = el.querySelector(".dc-stamp.release");
+
+    function onDown(e){
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      el.setPointerCapture(e.pointerId);
+      el.style.transition = "none";
+    }
+    function onMove(e){
+      if(!dragging) return;
+      curX = e.clientX - startX; curY = e.clientY - startY;
+      el.style.transform = "translate(" + curX + "px," + (curY * 0.15) + "px) rotate(" + (curX / 18) + "deg)";
+      keepStamp.style.opacity = curX < -20 ? Math.min(1, (-curX - 20) / 80) : 0;
+      releaseStamp.style.opacity = curX > 20 ? Math.min(1, (curX - 20) / 80) : 0;
+    }
+    function onUp(){
+      if(!dragging) return;
+      dragging = false;
+      el.style.transition = "transform .25s ease";
+      if(curX > 100){
+        el.style.transform = "translate(500px," + (curY * 0.15) + "px) rotate(20deg)";
+        el.style.opacity = "0";
+        setTimeout(function(){ classifyCurrent("releaseable"); }, 200);
+      } else if(curX < -100){
+        el.style.transform = "translate(-500px," + (curY * 0.15) + "px) rotate(-20deg)";
+        el.style.opacity = "0";
+        setTimeout(function(){ classifyCurrent("keep"); }, 200);
+      } else {
+        el.style.transform = "translate(0,0) rotate(0)";
+        keepStamp.style.opacity = 0;
+        releaseStamp.style.opacity = 0;
+      }
+      curX = 0; curY = 0;
+    }
+
+    el.addEventListener("pointerdown", onDown);
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerup", onUp);
+    el.addEventListener("pointercancel", onUp);
+  }
+
+  function renderDeck(){
+    var idx = state.declutter.deckIndex;
+    if(idx >= DECLUTTER_ITEMS.length){
+      finishDeck();
+      return;
+    }
+    $("#deck-progress").textContent = (idx + 1) + " / " + DECLUTTER_ITEMS.length;
+    var stage = $("#deck-stage");
+    stage.innerHTML = "";
+    if(DECLUTTER_ITEMS[idx + 1]){
+      stage.appendChild(buildDeckCardEl(DECLUTTER_ITEMS[idx + 1], false));
+    }
+    var curCard = buildDeckCardEl(DECLUTTER_ITEMS[idx], true);
+    stage.appendChild(curCard);
+    attachSwipe(curCard);
+  }
+
+  function classifyCurrent(status){
+    var idx = state.declutter.deckIndex;
+    var item = DECLUTTER_ITEMS[idx];
+    state.declutter.classifications[item.id] = status;
+    state.declutter.deckIndex++;
+    renderDeck();
+  }
+
+  $("#deck-btn-keep").addEventListener("click", function(){ classifyCurrent("keep"); });
+  $("#deck-btn-unsure").addEventListener("click", function(){ classifyCurrent("unsure"); });
+  $("#deck-btn-release").addEventListener("click", function(){ classifyCurrent("releaseable"); });
+
+  function finishDeck(){
+    var unsureIds = DECLUTTER_ITEMS
+      .filter(function(it){ return state.declutter.classifications[it.id] === "unsure"; })
+      .map(function(it){ return it.id; });
+    state.declutter.unsureQueue = unsureIds;
+    state.declutter.unsureIndex = 0;
+
+    DECLUTTER_ITEMS.forEach(function(it){
+      var cls = state.declutter.classifications[it.id];
+      if(cls === "keep") state.declutter.finalDecisions[it.id] = "keep";
+      else if(cls === "releaseable") state.declutter.finalDecisions[it.id] = "sell";
+    });
+
+    if(unsureIds.length > 0){
+      renderDialogue();
+      showScreen("screen-declutter-dialogue");
+    } else {
+      renderFinalList();
+      showScreen("screen-declutter-final");
+    }
+  }
+
+  // --- 迷い対話 ---
+  function appendChatBubble(role, text){
+    var bubble = document.createElement("div");
+    bubble.className = "chat-bubble " + role;
+    bubble.textContent = text;
+    $("#chat-log").appendChild(bubble);
+  }
+
+  function renderNextQuestion(item){
+    var dialogue = item.dialogue || GENERIC_DIALOGUE;
+    var qIndex = state.declutter.qIndex;
+    if(qIndex >= dialogue.length){
+      showDialogueSummary(item);
+      return;
+    }
+    var q = dialogue[qIndex];
+    appendChatBubble("ai", q.q);
+    var choicesEl = $("#chat-choices");
+    choicesEl.innerHTML = "";
+    q.choices.forEach(function(choiceText){
+      var btn = document.createElement("button");
+      btn.className = "chat-choice";
+      btn.textContent = choiceText;
+      btn.addEventListener("click", function(){
+        appendChatBubble("user", choiceText);
+        state.declutter.dialogueAnswers[item.id].push(choiceText);
+        state.declutter.qIndex++;
+        choicesEl.innerHTML = "";
+        setTimeout(function(){ renderNextQuestion(item); }, 300);
+      });
+      choicesEl.appendChild(btn);
+    });
+  }
+
+  function showDialogueSummary(item){
+    var answers = state.declutter.dialogueAnswers[item.id];
+    var summary = buildSummary(item, answers);
+    state.declutter.dialogueSummaries[item.id] = summary;
+    appendChatBubble("summary", summary);
+    $("#decision-row").hidden = false;
+  }
+
+  function renderDialogue(){
+    var id = state.declutter.unsureQueue[state.declutter.unsureIndex];
+    var item = findDeclutterItem(id);
+    state.declutter.qIndex = 0;
+    state.declutter.dialogueAnswers[id] = [];
+
+    var banner = $("#dialogue-progress");
+    if(state.declutter.unsureQueue.length > 1){
+      banner.hidden = false;
+      banner.textContent = "迷っている " + (state.declutter.unsureIndex + 1) + " / " + state.declutter.unsureQueue.length + " 件目です";
+    } else {
+      banner.hidden = true;
+    }
+
+    $("#dialogue-emoji").textContent = item.emoji;
+    $("#dialogue-name").textContent = item.name;
+    $("#chat-log").innerHTML = "";
+    $("#chat-choices").innerHTML = "";
+    $("#decision-row").hidden = true;
+    renderNextQuestion(item);
+  }
+
+  $all(".decision-btn").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var id = state.declutter.unsureQueue[state.declutter.unsureIndex];
+      state.declutter.finalDecisions[id] = btn.dataset.decision;
+      state.declutter.unsureIndex++;
+      if(state.declutter.unsureIndex < state.declutter.unsureQueue.length){
+        renderDialogue();
+      } else {
+        renderFinalList();
+        showScreen("screen-declutter-final");
+      }
+    });
+  });
+
+  // --- 最終整理 ---
+  function renderFinalList(){
+    var list = $("#final-list");
+    list.innerHTML = "";
+    DECLUTTER_ITEMS.forEach(function(item){
+      if(!state.declutter.finalDecisions[item.id]) state.declutter.finalDecisions[item.id] = "hold";
+
+      var row = document.createElement("div");
+      row.className = "final-row";
+      row.innerHTML =
+        '<div class="final-row-top"><span class="fr-emoji">' + item.emoji + '</span><span class="fr-name">' + item.name + '</span><span class="fr-price">推定 ' + yen(item.estimatedPrice) + '</span></div>' +
+        '<div class="decision-chip-row">' +
+          '<button class="decision-chip sell" data-decision="sell">売る</button>' +
+          '<button class="decision-chip keep" data-decision="keep">残す</button>' +
+          '<button class="decision-chip hold" data-decision="hold">保留</button>' +
+        '</div>';
+      list.appendChild(row);
+
+      var chipRow = row.querySelector(".decision-chip-row");
+      function refreshChips(){
+        $all(".decision-chip", chipRow).forEach(function(c){
+          c.classList.toggle("selected", c.dataset.decision === state.declutter.finalDecisions[item.id]);
+        });
+      }
+      refreshChips();
+      $all(".decision-chip", chipRow).forEach(function(c){
+        c.addEventListener("click", function(){
+          state.declutter.finalDecisions[item.id] = c.dataset.decision;
+          refreshChips();
+        });
+      });
+    });
+  }
+
+  $("#btn-to-plan").addEventListener("click", function(){
+    renderPlan2();
+    showScreen("screen-declutter-plan");
+  });
+
+  // --- 売却プラン ---
+  function renderPlan2(){
+    var sellItems = DECLUTTER_ITEMS.filter(function(it){ return state.declutter.finalDecisions[it.id] === "sell"; });
+    var total = sellItems.reduce(function(sum, it){ return sum + it.estimatedPrice; }, 0);
+    var target = state.declutter.targetYen;
+    var shortfall = target - total;
+
+    $("#plan2-total").textContent = yen(total);
+    var tile = $("#plan2-tile-goal"), label = $("#plan2-goal-label"), val = $("#plan2-goal-value");
+    if(shortfall > 0){
+      tile.className = "summary-tile warn";
+      label.textContent = "目標まであと";
+      val.textContent = yen(shortfall);
+    } else {
+      tile.className = "summary-tile done";
+      label.textContent = "目標達成";
+      val.textContent = yen(total);
+    }
+
+    var list = $("#plan2-list");
+    list.innerHTML = "";
+    if(sellItems.length === 0){
+      list.innerHTML = '<div class="album-empty">「売る」と決めた物がまだありません。最終確認画面で決定を選んでください。</div>';
+    }
+    sellItems.forEach(function(it){
+      var card = document.createElement("div");
+      card.className = "candidate-card";
+      card.innerHTML =
+        '<div class="cc-emoji">' + it.emoji + '</div>' +
+        '<div class="cc-body"><div class="cc-top"><span class="cc-name">' + it.name + '</span><span class="cc-price">' + yen(it.estimatedPrice) + '</span></div></div>';
+      list.appendChild(card);
+    });
+
+    $("#btn-to-memo").disabled = sellItems.length === 0;
+  }
+
+  $("#btn-to-memo").addEventListener("click", function(){
+    state.declutter.memoQueue = DECLUTTER_ITEMS
+      .filter(function(it){ return state.declutter.finalDecisions[it.id] === "sell"; })
+      .map(function(it){ return it.id; });
+    if(state.declutter.memoQueue.length === 0) return;
+    state.declutter.memoIndex = 0;
+    renderMemo();
+    showScreen("screen-declutter-memo");
+  });
+
+  // --- 出品メモ作成 ---
+  $all(".tag-chip", $("#memo-tags")).forEach(function(chip){
+    chip.addEventListener("click", function(){ chip.classList.toggle("selected"); });
+  });
+
+  function renderMemo(){
+    var item = findDeclutterItem(state.declutter.memoQueue[state.declutter.memoIndex]);
+    $("#memo-form").hidden = false;
+    $("#memo-success").hidden = true;
+
+    var banner = $("#memo-progress");
+    if(state.declutter.memoQueue.length > 1){
+      banner.hidden = false;
+      banner.textContent = "売ると決めた " + (state.declutter.memoIndex + 1) + " / " + state.declutter.memoQueue.length + " 件目のメモです";
+    } else {
+      banner.hidden = true;
+    }
+
+    $("#memo-photo").textContent = item.emoji;
+    $("#memo-name").value = item.name;
+    $("#memo-price").value = item.estimatedPrice;
+    $("#memo-episode").value = "";
+    $("#memo-reason").value = "";
+    $all(".tag-chip", $("#memo-tags")).forEach(function(c){ c.classList.remove("selected"); });
+  }
+
+  $("#btn-memo-save").addEventListener("click", function(){
+    var item = findDeclutterItem(state.declutter.memoQueue[state.declutter.memoIndex]);
+    var tags = $all(".tag-chip.selected", $("#memo-tags")).map(function(c){ return c.dataset.value; });
+    var today = new Date().toISOString().slice(0, 10);
+
+    ALBUM.unshift({
+      id: item.id + "-" + Date.now(),
+      title: $("#memo-name").value || item.name,
+      emoji: item.emoji,
+      listedAt: today,
+      soldAt: today,
+      soldPrice: parseInt($("#memo-price").value, 10) || item.estimatedPrice,
+      episode: $("#memo-episode").value,
+      lettingGoReason: $("#memo-reason").value,
+      reflectionSummary: state.declutter.dialogueSummaries[item.id] || null,
+      tags: tags
+    });
+
+    $("#memo-form").hidden = true;
+    $("#memo-success").hidden = false;
+    $("#memo-success-title").textContent = "「" + item.name + "」をアルバムに保存しました";
+
+    var remaining = state.declutter.memoQueue.length - state.declutter.memoIndex - 1;
+    var actions = $("#memo-next-actions");
+    actions.innerHTML = "";
+
+    if(remaining > 0){
+      var nextBtn = document.createElement("button");
+      nextBtn.className = "cta";
+      nextBtn.textContent = "次のメモを書く（残り" + remaining + "件）";
+      nextBtn.addEventListener("click", function(){
+        state.declutter.memoIndex++;
+        renderMemo();
+      });
+      actions.appendChild(nextBtn);
+    }
+
+    var albumBtn = document.createElement("button");
+    albumBtn.className = "cta ghost";
+    albumBtn.style.marginTop = remaining > 0 ? "10px" : "0";
+    albumBtn.textContent = "アルバムを見る";
+    albumBtn.addEventListener("click", function(){
+      renderAlbum();
+      showScreen("screen-album");
+    });
+    actions.appendChild(albumBtn);
+
+    var homeBtn2 = document.createElement("button");
+    homeBtn2.className = "cta ghost";
+    homeBtn2.style.marginTop = "10px";
+    homeBtn2.textContent = "ホームに戻る";
+    homeBtn2.addEventListener("click", function(){ showScreen("screen-home"); });
+    actions.appendChild(homeBtn2);
+  });
+
+  // --- アルバム ---
+  function renderAlbum(){
+    var list = $("#album-list");
+    list.innerHTML = "";
+    if(ALBUM.length === 0){
+      list.innerHTML = '<div class="album-empty">まだ手放したものはありません。</div>';
+      return;
+    }
+    ALBUM.forEach(function(entry){
+      var card = document.createElement("div");
+      card.className = "album-card";
+      var tagsHtml = entry.tags.map(function(t){ return '<span class="album-tag">#' + t + '</span>'; }).join("");
+      card.innerHTML =
+        '<div class="album-card-top"><span class="ac-emoji">' + entry.emoji + '</span><div><div class="ac-title">' + entry.title + '</div><div class="ac-date">' + entry.soldAt + ' 売却</div></div><span class="ac-price">' + yen(entry.soldPrice) + '</span></div>' +
+        (entry.tags.length ? '<div class="album-tags">' + tagsHtml + '</div>' : '') +
+        (entry.episode ? '<div class="album-episode"><span class="ae-label">エピソード</span>' + entry.episode + '</div>' : '') +
+        (entry.lettingGoReason ? '<div class="album-episode"><span class="ae-label">手放した理由</span>' + entry.lettingGoReason + '</div>' : '');
+      list.appendChild(card);
+    });
+  }
+
+})();
+</script>
+</body>
+</html>
