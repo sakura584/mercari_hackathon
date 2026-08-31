@@ -221,12 +221,53 @@ service firebase.storage {
 }
 ```
 
-- [ ] **Step 10: `npm run build` が通ることを確認する**
+- [ ] **Step 10: `vitest.config.ts`で`@/`エイリアスを設定する**
+
+`create-next-app --import-alias "@/*"`はTypeScript/Next.jsのビルド向けにしか`@/*`を解決しない。Vitestは独自にモジュール解決するため、Task 9以降のテスト（`@/lib/...`形式のimportを使う）が解決できるよう、ここで明示的に設定する。
+
+`vitest.config.ts`:
+
+```ts
+import path from "node:path";
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname),
+    },
+  },
+  test: {
+    environment: "node",
+  },
+});
+```
+
+`@/`エイリアスが実際に解決できることをこの場で検証するため、一時ファイルでテストを書いて実行し、削除する:
+
+```bash
+cat > lib/__alias_check.test.ts <<'EOF'
+import { describe, expect, it } from "vitest";
+import { CLAUDE_MODEL } from "@/lib/anthropic";
+
+describe("@/ alias", () => {
+  it("resolves to lib/anthropic.ts", () => {
+    expect(CLAUDE_MODEL).toBe("claude-sonnet-5");
+  });
+});
+EOF
+npx vitest run lib/__alias_check.test.ts
+rm lib/__alias_check.test.ts
+```
+
+Expected: 削除前の実行はPASS（1 test）。`@/lib/anthropic`が正しく`lib/anthropic.ts`に解決されていることを確認できたら一時ファイルを削除する。
+
+- [ ] **Step 11: `npm run build` が通ることを確認する**
 
 Run: `npm run build`
 Expected: ビルド成功（Next.jsのデフォルトページのみ）
 
-- [ ] **Step 11: Commit**
+- [ ] **Step 12: Commit**
 
 ```bash
 git add -A
