@@ -7,6 +7,7 @@ import type { Item, PurposeType } from "@/lib/types";
 import { HomeScreen } from "./screens/HomeScreen";
 import { IntroScreen } from "./screens/IntroScreen";
 import { LoadingScreen } from "./screens/LoadingScreen";
+import { DeckScreen } from "./screens/DeckScreen";
 
 type Screen = "home" | "intro" | "loading" | "deck" | "final" | "dialogue" | "plan" | "album";
 
@@ -52,7 +53,20 @@ export function DeclutterApp() {
     return <LoadingScreen message="写真を読み込み中..." />;
   }
 
-  // Task 20以降でdeck/final/dialogue/plan/albumを追加する
+  if (screen === "deck" && sessionId) {
+    return (
+      <DeckScreen
+        sessionId={sessionId}
+        items={items}
+        onComplete={(classifiedItems) => {
+          setItems(classifiedItems);
+          setScreen("final");
+        }}
+      />
+    );
+  }
+
+  // "final"分岐はTask 21で追加する
   return (
     <section className="screen active">
       <div className="screen-scroll">
