@@ -8,6 +8,7 @@ import { HomeScreen } from "./screens/HomeScreen";
 import { IntroScreen } from "./screens/IntroScreen";
 import { LoadingScreen } from "./screens/LoadingScreen";
 import { DeckScreen } from "./screens/DeckScreen";
+import { FinalScreen } from "./screens/FinalScreen";
 
 type Screen = "home" | "intro" | "loading" | "deck" | "final" | "dialogue" | "plan" | "album";
 
@@ -66,7 +67,20 @@ export function DeclutterApp() {
     );
   }
 
-  // "final"分岐はTask 21で追加する
+  if (screen === "final" && sessionId) {
+    return (
+      <FinalScreen
+        sessionId={sessionId}
+        items={items}
+        onAllDecided={(decidedItems) => {
+          setItems(decidedItems);
+          setScreen("plan");
+        }}
+      />
+    );
+  }
+
+  // "plan"分岐はTask 22で追加する
   return (
     <section className="screen active">
       <div className="screen-scroll">
