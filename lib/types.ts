@@ -1,16 +1,10 @@
-export type PurposeType =
-  | "earn_money"
-  | "declutter"
-  | "preserve_memories"
-  | "consider_letting_go"
-  | "other";
-
-export type Session = {
+export type Collection = {
   id: string;
-  purposeType: PurposeType;
-  targetAmount?: number;
-  note?: string;
+  ownerName: string;
+  title: string;
+  coverImageUrl?: string;
   createdAt: string;
+  likeCount: number;
 };
 
 export type ItemClassification = "keep" | "unsure" | "releaseable";
@@ -18,7 +12,7 @@ export type FinalDecision = "keep" | "let_go" | "hold";
 
 export type Item = {
   id: string;
-  sessionId: string;
+  collectionId: string;
   imageUrl: string;
   sourceImageId?: string;
   title: string;
@@ -26,6 +20,8 @@ export type Item = {
   estimatedPrice?: number;
   initialClassification?: ItemClassification;
   finalDecision?: FinalDecision;
+  x?: number;
+  y?: number;
 };
 
 export type AttachmentType =
@@ -75,5 +71,38 @@ export type MemoryRecord = {
   soldPrice?: number;
   listedAt?: string;
   soldAt?: string;
+  createdAt: string;
+};
+
+export type ReleaseCandidate = {
+  itemId: string;
+  itemName: string;
+  reason: string;
+};
+
+export type Like = {
+  likerId: string;
+  collectionId: string;
+  createdAt: string;
+};
+
+export type BuyRequestStatus = "pending" | "declined" | "listed";
+
+export type BuyRequest = {
+  id: string;
+  collectionId: string;
+  itemId: string;
+  itemName: string;
+  fromName: string;
+  price: number;
+  status: BuyRequestStatus;
+  createdAt: string;
+};
+
+export type Comment = {
+  id: string;
+  collectionId: string;
+  authorName: string;
+  text: string;
   createdAt: string;
 };
