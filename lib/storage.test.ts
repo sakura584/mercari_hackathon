@@ -6,13 +6,13 @@ const ONE_PX_PNG_BASE64 =
 
 describe("uploadRoomImage", () => {
   it("uploads a base64 image and returns a public URL", async () => {
-    const url = await uploadRoomImage("session_test", ONE_PX_PNG_BASE64, "image/png");
+    const url = await uploadRoomImage("collection_test", ONE_PX_PNG_BASE64, "image/png");
     expect(url).toMatch(/^https?:\/\//);
   });
 
   it("stores different uploads under different paths", async () => {
-    const first = await uploadRoomImage("session_test", ONE_PX_PNG_BASE64, "image/png");
-    const second = await uploadRoomImage("session_test", ONE_PX_PNG_BASE64, "image/png");
+    const first = await uploadRoomImage("collection_test", ONE_PX_PNG_BASE64, "image/png");
+    const second = await uploadRoomImage("collection_test", ONE_PX_PNG_BASE64, "image/png");
     expect(first).not.toBe(second);
   });
 });

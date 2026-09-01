@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createSession } from "@/lib/repositories/session-repository";
+import { createCollection } from "@/lib/repositories/collection-repository";
 
 const generateContentMock = vi.fn();
 vi.mock("@/lib/gemini", () => ({ GEMINI_MODEL: "gemini-test", getGeminiClient: () => ({ models: { generateContent: generateContentMock } }) }));
@@ -12,20 +12,57 @@ function request(body: unknown) {
 describe("POST /api/items/extract", () => {
   beforeEach(() => generateContentMock.mockReset());
 
-  it("creates items from Gemini structured output", async () => {
+  it("creates items from Gemini structured output (collection mode, default)", async () => {
     generateContentMock.mockResolvedValue({ text: JSON.stringify({ items: [{ title: "Tシャツ", category: "clothing_tshirt" }, { title: "本", category: "book" }] }) });
-    const session = await createSession({ purposeType: "declutter" });
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
     const { POST } = await import("./route");
-    const res = await POST(request({ sessionId: session.id, imageBase64: "abc", mimeType: "image/png" }));
+    const res = await POST(request({ collectionId: collection.id, imageBase64: "abc", mimeType: "image/png" }));
     expect(res.status).toBe(201);
     expect((await res.json()).items).toHaveLength(2);
   });
 
+  it("passes through pin coordinates when Gemini returns them", async () => {
+    generateContentMock.mockResolvedValue({
+      text: JSON.stringify({ items: [{ title: "フィギュア", category: "figure", x: 30, y: 62 }] }),
+    });
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
+    const { POST } = await import("./route");
+    const res = await POST(request({ collectionId: collection.id, imageBase64: "abc", mimeType: "image/png" }));
+    const body = await res.json();
+    expect(body.items[0].x).toBe(30);
+    expect(body.items[0].y).toBe(62);
+  });
+
+  it("keeps only the highest-confidence item in single mode when Gemini returns more than one", async () => {
+    generateContentMock.mockResolvedValue({
+      text: JSON.stringify({
+        items: [
+          { title: "背景の棚", category: "default", confidence: 0.2 },
+          { title: "フィギュア", category: "figure", confidence: 0.9 },
+        ],
+      }),
+    });
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
+    const { POST } = await import("./route");
+    const res = await POST(request({ collectionId: collection.id, imageBase64: "abc", mimeType: "image/png", mode: "single" }));
+    const body = await res.json();
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0].title).toBe("フィギュア");
+  });
+
   it("falls back when Gemini fails", async () => {
     generateContentMock.mockResolvedValue({ text: "{}" });
-    const session = await createSession({ purposeType: "declutter" });
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
     const { POST } = await import("./route");
-    const res = await POST(request({ sessionId: session.id, imageBase64: "abc", mimeType: "image/png" }));
+    const res = await POST(request({ collectionId: collection.id, imageBase64: "abc", mimeType: "image/png" }));
     expect((await res.json()).items.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("falls back to a single item in single mode when Gemini fails", async () => {
+    generateContentMock.mockResolvedValue({ text: "{}" });
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
+    const { POST } = await import("./route");
+    const res = await POST(request({ collectionId: collection.id, imageBase64: "abc", mimeType: "image/png", mode: "single" }));
+    expect((await res.json()).items).toHaveLength(1);
   });
 });
