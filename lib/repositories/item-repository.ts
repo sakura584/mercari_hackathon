@@ -54,3 +54,17 @@ export async function updateItemDecision(
   const db = getAdminFirestore();
   await db.doc(itemPath(collectionId, itemId)).update({ finalDecision: decision });
 }
+
+export async function updateItemTitle(
+  collectionId: string,
+  itemId: string,
+  title: string
+): Promise<void> {
+  const db = getAdminFirestore();
+  await db.doc(itemPath(collectionId, itemId)).update({ title });
+}
+
+export async function deleteItem(collectionId: string, itemId: string): Promise<void> {
+  const db = getAdminFirestore();
+  await db.doc(itemPath(collectionId, itemId)).delete();
+}

@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { createCollection } from "./collection-repository";
 import {
   createItem,
+  deleteItem,
   listItems,
   updateItemClassification,
   updateItemDecision,
+  updateItemTitle,
 } from "./item-repository";
 
 describe("item-repository", () => {
@@ -56,5 +58,34 @@ describe("item-repository", () => {
 
     expect(item.x).toBe(30);
     expect(item.y).toBe(42);
+  });
+
+  it("updates the title", async () => {
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
+    const item = await createItem({
+      collectionId: collection.id,
+      imageUrl: "https://example.com/book.jpg",
+      title: "小説",
+      category: "book",
+    });
+
+    await updateItemTitle(collection.id, item.id, "小説（改題）");
+
+    const [updated] = await listItems(collection.id);
+    expect(updated.title).toBe("小説（改題）");
+  });
+
+  it("deletes an item", async () => {
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
+    const item = await createItem({
+      collectionId: collection.id,
+      imageUrl: "https://example.com/book.jpg",
+      title: "小説",
+      category: "book",
+    });
+
+    await deleteItem(collection.id, item.id);
+
+    expect(await listItems(collection.id)).toEqual([]);
   });
 });
