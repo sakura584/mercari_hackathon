@@ -12,8 +12,10 @@ const PURPOSE_OPTIONS: Array<{ value: PurposeType; label: string }> = [
 
 export function IntroScreen({
   onSubmit,
+  allowMockSubmit = false,
 }: {
-  onSubmit: (input: { purposeType: PurposeType; targetAmount: number; file: File }) => void;
+  onSubmit: (input: { purposeType: PurposeType; targetAmount: number; file?: File }) => void;
+  allowMockSubmit?: boolean;
 }) {
   const [purposeType, setPurposeType] = useState<PurposeType>("consider_letting_go");
   const [targetAmount, setTargetAmount] = useState(10000);
@@ -71,8 +73,8 @@ export function IntroScreen({
           <button
             type="button"
             className="cta"
-            disabled={!file}
-            onClick={() => file && onSubmit({ purposeType, targetAmount, file })}
+            disabled={!file && !allowMockSubmit}
+            onClick={() => onSubmit({ purposeType, targetAmount, file: file ?? undefined })}
           >
             商品候補を抽出する
           </button>

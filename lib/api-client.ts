@@ -6,6 +6,9 @@ import type {
   PurposeType,
   ReflectionState,
 } from "./types";
+import { mockApiClient } from "./mock-api-client";
+
+export const isMockMode = process.env.NEXT_PUBLIC_USE_MOCK === "true";
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, {
@@ -17,7 +20,7 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   return res.json();
 }
 
-export const apiClient = {
+const realApiClient = {
   createSession(input: { purposeType: PurposeType; targetAmount?: number; note?: string }) {
     return postJson<{ id: string; purposeType: PurposeType; targetAmount?: number }>(
       "/api/sessions",
@@ -73,6 +76,8 @@ export const apiClient = {
     return res.json();
   },
 };
+
+export const apiClient = isMockMode ? mockApiClient : realApiClient;
 
 const MAX_DIMENSION = 1024;
 const JPEG_QUALITY = 0.8;

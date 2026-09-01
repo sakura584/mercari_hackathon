@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { apiClient, resizeImageToBase64 } from "@/lib/api-client";
+import { apiClient, isMockMode, resizeImageToBase64 } from "@/lib/api-client";
 import { useSessionId } from "@/hooks/useSessionId";
 import type { Item, PurposeType } from "@/lib/types";
 import { HomeScreen } from "./screens/HomeScreen";
@@ -23,7 +23,7 @@ export function DeclutterApp() {
   async function handleIntroSubmit(input: {
     purposeType: PurposeType;
     targetAmount: number;
-    file: File;
+    file?: File;
   }) {
     setTargetAmount(input.targetAmount);
     setScreen("loading");
@@ -34,7 +34,9 @@ export function DeclutterApp() {
     });
     setSessionId(session.id);
 
-    const { base64, mimeType } = await resizeImageToBase64(input.file);
+    const { base64, mimeType } = input.file
+      ? await resizeImageToBase64(input.file)
+      : { base64: "", mimeType: "image/jpeg" };
     const { items: extractedItems } = await apiClient.extractItems({
       sessionId: session.id,
       imageBase64: base64,
@@ -49,7 +51,7 @@ export function DeclutterApp() {
   }
 
   if (screen === "intro") {
-    return <IntroScreen onSubmit={handleIntroSubmit} />;
+    return <IntroScreen onSubmit={handleIntroSubmit} allowMockSubmit={isMockMode} />;
   }
 
   if (screen === "loading") {

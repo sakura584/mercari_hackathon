@@ -5,6 +5,14 @@ import { apiClient } from "@/lib/api-client";
 import type { FinalDecision, Item } from "@/lib/types";
 import { DialogueScreen } from "./DialogueScreen";
 
+function decisionsFromInitialClassifications(items: Item[]): Record<string, FinalDecision> {
+  return items.reduce<Record<string, FinalDecision>>((decisions, item) => {
+    if (item.initialClassification === "keep") decisions[item.id] = "keep";
+    if (item.initialClassification === "releaseable") decisions[item.id] = "let_go";
+    return decisions;
+  }, {});
+}
+
 export function FinalScreen({
   sessionId,
   items,
@@ -14,7 +22,11 @@ export function FinalScreen({
   items: Item[];
   onAllDecided: (decidedItems: Item[]) => void;
 }) {
-  const [decided, setDecided] = useState<Record<string, FinalDecision>>({});
+  // 「残す」「手放す」は一次判断をそのまま最終判断として引き継ぐ。
+  // 「迷う」だけがReflection Agentによる追加判断の対象になる。
+  const [decided, setDecided] = useState<Record<string, FinalDecision>>(() =>
+    decisionsFromInitialClassifications(items)
+  );
   const unsureItems = useMemo(
     () => items.filter((item) => item.initialClassification === "unsure"),
     [items]
