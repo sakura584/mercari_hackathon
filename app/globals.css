@@ -423,3 +423,126 @@ input[type="number"].yen-input:focus{ outline:2px solid var(--brand); border-col
   height: 100vh;
   border-radius: 0;
 }
+
+/* --- コレクション機能 --- */
+.collection-photo-empty{
+  margin:16px; aspect-ratio:1/1; border-radius:var(--radius); border:1.5px dashed var(--line);
+  background:#fafaf8; display:flex; align-items:center; justify-content:center;
+}
+.collection-photo-area{ position:relative; width:100%; aspect-ratio:1/1; background:#eee; overflow:hidden; }
+.collection-photo-area--framed{ border-radius:var(--radius); margin-bottom:16px; }
+.collection-photo-area img{ width:100%; height:100%; object-fit:cover; display:block; }
+
+.collection-pin{
+  position:absolute; width:14px; height:14px; margin:-7px 0 0 -7px; padding:0;
+  border-radius:50%; background:var(--brand); border:2px solid #fff;
+  box-shadow:0 0 0 2px rgba(255,2,17,0.35); cursor:pointer; z-index:10;
+}
+.collection-tag-popup{
+  position:absolute; transform:translate(-50%, calc(-100% - 14px));
+  background:#fff; border-radius:12px; padding:12px 14px; min-width:160px; max-width:220px;
+  box-shadow:0 8px 24px rgba(0,0,0,0.22); font-size:12px; z-index:40;
+}
+.collection-tag-popup .tp-name{ font-weight:800; font-size:13.5px; margin-bottom:4px; }
+.collection-tag-popup .tp-cat{ color:var(--ink-soft); font-size:11px; margin-bottom:8px; }
+.collection-tag-popup .tp-status{
+  display:inline-block; background:var(--gray-soft); color:var(--ink-soft);
+  font-size:10px; padding:3px 9px; border-radius:999px; margin-bottom:9px;
+}
+
+.collection-tag-row{
+  display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:1px solid var(--line);
+}
+.collection-tag-row.excluded .collection-tag-row-info{ opacity:.4; }
+.collection-tag-row-info{ flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; }
+.collection-tag-name-input{
+  border:none; border-bottom:1px solid transparent; background:transparent;
+  font-size:14px; font-weight:800; padding:2px 0; width:100%; color:var(--ink); font-family:inherit;
+}
+.collection-tag-name-input:focus{ border-bottom-color:var(--brand); outline:none; }
+.collection-tag-category{ font-size:11px; color:var(--ink-soft); }
+.collection-switch{
+  width:38px; height:22px; border-radius:11px; background:var(--gray-soft);
+  position:relative; flex-shrink:0; border:none; cursor:pointer; padding:0; transition:background .15s;
+}
+.collection-switch.on{ background:var(--brand); }
+.collection-switch-knob{
+  position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%;
+  background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.25); transition:left .15s;
+}
+.collection-switch.on .collection-switch-knob{ left:18px; }
+
+.collection-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:16px; }
+.collection-cell{
+  cursor:pointer; text-align:left; background:none; border:none; padding:0; display:block; width:100%;
+}
+.collection-cell-photo-wrap{ position:relative; border-radius:10px; overflow:hidden; aspect-ratio:1/1; }
+.collection-cell-photo-wrap img{ width:100%; height:100%; object-fit:cover; display:block; }
+.collection-tag-count-badge{
+  position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.55); color:#fff;
+  font-size:10.5px; padding:3px 8px; border-radius:999px;
+}
+.collection-cell-meta{ display:flex; align-items:center; gap:4px; margin-top:8px; font-size:12px; color:var(--ink-soft); }
+.collection-empty-state{ padding:60px 20px; text-align:center; color:var(--ink-soft); font-size:13px; }
+
+.collection-profile-tabs{ display:flex; border-bottom:1px solid var(--line); }
+.collection-profile-tab{
+  flex:1; text-align:center; padding:12px 0; font-size:13px; color:var(--ink-soft); font-weight:600;
+  background:none; border:none; border-bottom:2px solid transparent; cursor:pointer;
+}
+.collection-profile-tab.active{ color:var(--ink); border-bottom-color:var(--brand); font-weight:800; }
+
+.collection-detail-user-row{ display:flex; align-items:center; gap:10px; padding:14px 0; }
+.collection-detail-user-name{ font-weight:800; font-size:13.5px; }
+.collection-detail-posted-at{ font-size:11px; color:var(--ink-soft); }
+
+.collection-action-bar{
+  display:flex; align-items:center; gap:22px; padding:14px 0; margin-top:8px;
+  border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+}
+.collection-action-item{
+  display:flex; align-items:center; gap:6px; font-size:13px; color:#555;
+  background:none; border:none; cursor:pointer; padding:0;
+}
+.collection-action-item .icon{ font-size:18px; }
+.collection-action-item.liked{ color:var(--brand); }
+
+.collection-comments-section{ padding:14px 0 4px; }
+.collection-comment-row{ display:flex; gap:8px; margin-bottom:12px; font-size:13px; line-height:1.6; }
+.collection-comment-user{ font-weight:800; margin-right:6px; }
+.collection-comment-input-row{ display:flex; gap:8px; margin-top:10px; align-items:center; }
+.collection-comment-input{
+  flex:1; border:1px solid var(--line); border-radius:18px; padding:9px 14px; font-size:13px; font-family:inherit;
+}
+.collection-comment-send-btn{
+  border:none; background:var(--brand); color:#fff; border-radius:16px;
+  padding:9px 16px; font-size:12.5px; font-weight:800; cursor:pointer;
+}
+
+.collection-role-banner{
+  position:absolute; left:12px; right:12px; bottom:16px; background:#222; color:#fff;
+  border-radius:12px; padding:12px 14px; display:flex; align-items:center; justify-content:space-between;
+  gap:10px; z-index:70; box-shadow:0 6px 20px rgba(0,0,0,0.3);
+}
+.collection-role-banner span{ font-size:11px; color:#ccc; flex-shrink:0; }
+.collection-role-banner button{
+  background:var(--brand); color:#fff; border:none; border-radius:8px;
+  padding:9px 12px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap;
+}
+
+.collection-notif-price{ font-size:19px; font-weight:900; color:var(--brand); }
+
+.collection-price-slider{ width:100%; margin:12px 0 16px; accent-color:var(--brand); }
+.collection-sheet-note{ font-size:11.5px; color:var(--ink-soft); line-height:1.6; margin:0 0 16px; }
+
+.collection-loading-overlay{
+  position:absolute; inset:0; background:rgba(255,255,255,0.95); z-index:90;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px;
+}
+.collection-loading-text{ font-size:13.5px; color:#555; font-weight:600; }
+
+.collection-toast{
+  position:absolute; left:50%; bottom:110px; transform:translateX(-50%);
+  background:rgba(20,20,20,0.85); color:#fff; padding:10px 20px; border-radius:20px;
+  font-size:13px; z-index:120; white-space:nowrap;
+}

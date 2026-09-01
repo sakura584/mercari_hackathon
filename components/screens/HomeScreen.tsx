@@ -1,4 +1,12 @@
-export function HomeScreen({ onStart }: { onStart: () => void }) {
+export function HomeScreen({
+  onStart,
+  onOpenCollectionCreate,
+  onOpenCollectionMyPage,
+}: {
+  onStart: () => void;
+  onOpenCollectionCreate: () => void;
+  onOpenCollectionMyPage: () => void;
+}) {
   return (
     <section className="screen active">
       <div className="home-header">
@@ -22,13 +30,16 @@ export function HomeScreen({ onStart }: { onStart: () => void }) {
         <button type="button" className="tab-item">
           <span className="tab-icon">🔍</span>検索
         </button>
+        <button type="button" className="tab-item" onClick={onOpenCollectionCreate}>
+          <span className="tab-icon">🏷</span>コレクション
+        </button>
         <button type="button" className="tab-item tab-sell">
           <span className="tab-icon">📷</span>出品
         </button>
         <button type="button" className="tab-item">
           <span className="tab-icon">🔔</span>お知らせ
         </button>
-        <button type="button" className="tab-item">
+        <button type="button" className="tab-item" onClick={onOpenCollectionMyPage}>
           <span className="tab-icon">👤</span>マイページ
         </button>
       </div>
