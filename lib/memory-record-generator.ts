@@ -1,44 +1,27 @@
-import { CLAUDE_MODEL, getAnthropicClient } from "./anthropic";
+import { FunctionCallingConfigMode } from "@google/genai";
+import { GEMINI_MODEL, getGeminiClient } from "./gemini";
 import { SAVE_MEMORY_RECORD_TOOL } from "./memory-record-tool";
 import type { ReflectionState } from "./types";
 
-type MemoryRecordText = {
-  episode?: string;
-  memory: string;
-  reasonForLettingGo?: string;
-  tags: string[];
-};
+type MemoryRecordText = { episode?: string; memory: string; reasonForLettingGo?: string; tags: string[] };
 
-export async function generateMemoryRecordText(
-  itemName: string,
-  reflectionState: ReflectionState | null
-): Promise<MemoryRecordText> {
-  const client = getAnthropicClient();
-  const context = reflectionState
-    ? JSON.stringify(reflectionState)
-    : JSON.stringify({ itemName, note: "対話は行われていない" });
-
-  const response = await client.messages.create({
-    model: CLAUDE_MODEL,
-    max_tokens: 512,
-    tools: [SAVE_MEMORY_RECORD_TOOL],
-    tool_choice: { type: "tool", name: "save_memory_record" },
-    messages: [
-      {
-        role: "user",
-        content: `ユーザーは「${itemName}」を手放すことに決めました。以下の情報をもとに、手放したものアルバムに残す短いエピソード文と、残しておきたい記憶を整えてください。\n\n${context}`,
-      },
-    ],
+export async function generateMemoryRecordText(itemName: string, reflectionState: ReflectionState | null): Promise<MemoryRecordText> {
+  const context = reflectionState ? JSON.stringify(reflectionState) : JSON.stringify({ itemName, note: "対話は行われていない" });
+  const response = await getGeminiClient().models.generateContent({
+    model: GEMINI_MODEL,
+    contents: `「${itemName}」を手放すことになりました。思い出アルバム用に短く整理してください。\n${context}`,
+    config: {
+      tools: [{ functionDeclarations: [SAVE_MEMORY_RECORD_TOOL] }],
+      toolConfig: { functionCallingConfig: {
+        mode: FunctionCallingConfigMode.ANY,
+        allowedFunctionNames: ["save_memory_record"],
+      } },
+    },
   });
-
-  const toolUse = response.content.find(
-    (block): block is Extract<typeof block, { type: "tool_use" }> => block.type === "tool_use"
-  );
-  const input = toolUse?.input as MemoryRecordText | undefined;
-
+  const input = response.functionCalls?.[0]?.args as MemoryRecordText | undefined;
   return {
     episode: input?.episode,
-    memory: input?.memory ?? `${itemName}を手放しました。`,
+    memory: input?.memory ?? `${itemName}を手放した。`,
     reasonForLettingGo: input?.reasonForLettingGo,
     tags: input?.tags ?? [],
   };
