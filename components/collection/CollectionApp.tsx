@@ -87,10 +87,14 @@ export function CollectionApp({
 }) {
   const [ownerName, setOwnerName] = useState("");
   const [ownerNameLoaded, setOwnerNameLoaded] = useState(false);
-  const [ownerNameDraft, setOwnerNameDraft] = useState("");
 
   useEffect(() => {
-    setOwnerName(getStoredOwnerName());
+    // ログイン機能はないため、表示名は初回アクセス時に自動採番してlocalStorageに保持する
+    // （collection.htmlの固定デモユーザーに相当。ユーザーへの入力は求めない）。
+    const stored = getStoredOwnerName();
+    const name = stored || "ゲスト";
+    if (!stored) storeOwnerName(name);
+    setOwnerName(name);
     setOwnerNameLoaded(true);
   }, []);
 
@@ -316,42 +320,6 @@ export function CollectionApp({
   }
 
   if (!ownerNameLoaded) return null;
-
-  if (!ownerName) {
-    return (
-      <section className="screen active">
-        <div className="app-bar">
-          <button type="button" className="back-chevron" onClick={onExit}>
-            ←
-          </button>
-          <div className="app-bar-title">表示名を設定</div>
-        </div>
-        <div className="screen-scroll">
-          <p className="hero-sub">コレクション機能を使うには、表示名を1つ決めてください（ログイン不要）。</p>
-          <div className="draft-field">
-            <label>表示名</label>
-            <input
-              className="draft-input"
-              value={ownerNameDraft}
-              onChange={(e) => setOwnerNameDraft(e.target.value)}
-              placeholder="例：ゆうき"
-            />
-          </div>
-          <button
-            type="button"
-            className="cta"
-            disabled={!ownerNameDraft.trim()}
-            onClick={() => {
-              storeOwnerName(ownerNameDraft.trim());
-              setOwnerName(ownerNameDraft.trim());
-            }}
-          >
-            決定
-          </button>
-        </div>
-      </section>
-    );
-  }
 
   let content: ReactNode = null;
   if (screen === "create") {
