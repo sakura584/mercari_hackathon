@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { createCollection } from "@/lib/repositories/collection-repository";
 import { createItem } from "@/lib/repositories/item-repository";
+import { createComment } from "@/lib/repositories/comment-repository";
 import { GET } from "./route";
 
 describe("GET /api/collections/[collectionId]", () => {
-  it("returns the collection with its items", async () => {
+  it("returns the collection with its items and comments", async () => {
     const collection = await createCollection({ ownerName: "A", title: "コレクション" });
     await createItem({
       collectionId: collection.id,
@@ -12,6 +13,7 @@ describe("GET /api/collections/[collectionId]", () => {
       title: "本",
       category: "book",
     });
+    await createComment({ collectionId: collection.id, authorName: "あおい", text: "いいですね" });
 
     const res = await GET(new Request("http://localhost/api/collections/x"), {
       params: Promise.resolve({ collectionId: collection.id }),
@@ -21,6 +23,8 @@ describe("GET /api/collections/[collectionId]", () => {
     const body = await res.json();
     expect(body.collection.id).toBe(collection.id);
     expect(body.items).toHaveLength(1);
+    expect(body.comments).toHaveLength(1);
+    expect(body.comments[0].authorName).toBe("あおい");
   });
 
   it("returns 404 for an unknown collection", async () => {

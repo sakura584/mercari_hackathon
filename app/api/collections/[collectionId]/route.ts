@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCollection } from "@/lib/repositories/collection-repository";
 import { listItems } from "@/lib/repositories/item-repository";
+import { listComments } from "@/lib/repositories/comment-repository";
 
 export async function GET(
   _request: Request,
@@ -13,6 +14,10 @@ export async function GET(
     return NextResponse.json({ error: "collection not found" }, { status: 404 });
   }
 
-  const items = await listItems(collectionId);
-  return NextResponse.json({ collection, items }, { status: 200 });
+  const [items, comments] = await Promise.all([
+    listItems(collectionId),
+    listComments(collectionId),
+  ]);
+
+  return NextResponse.json({ collection, items, comments }, { status: 200 });
 }
