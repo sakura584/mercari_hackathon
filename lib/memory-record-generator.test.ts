@@ -1,63 +1,16 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const messagesCreateMock = vi.fn();
-
-vi.mock("./anthropic", () => ({
-  CLAUDE_MODEL: "claude-sonnet-5",
-  getAnthropicClient: () => ({ messages: { create: messagesCreateMock } }),
-}));
+const generateContentMock = vi.fn();
+vi.mock("./gemini", () => ({ GEMINI_MODEL: "gemini-test", getGeminiClient: () => ({ models: { generateContent: generateContentMock } }) }));
 
 describe("generateMemoryRecordText", () => {
-  beforeEach(() => {
-    messagesCreateMock.mockReset();
-  });
+  beforeEach(() => generateContentMock.mockReset());
 
-  it("uses reflection state as context when available", async () => {
-    messagesCreateMock.mockResolvedValue({
-      content: [
-        {
-          type: "tool_use",
-          name: "save_memory_record",
-          input: {
-            episode: "最後の大会で着たTシャツ。",
-            memory: "2回生最後の大会でチームとして初めて優勝したこと",
-            reasonForLettingGo: "今後着る予定はない",
-            tags: ["サークル", "卒業"],
-          },
-        },
-      ],
-    });
-
+  it("reads the save_memory_record function call", async () => {
+    generateContentMock.mockResolvedValue({ functionCalls: [{ name: "save_memory_record", args: { memory: "大切な思い出", tags: ["旅行"] } }] });
     const { generateMemoryRecordText } = await import("./memory-record-generator");
-    const result = await generateMemoryRecordText("サークルTシャツ", {
-      itemId: "item_001",
-      itemName: "サークルTシャツ",
-      attachmentTypes: ["memory"],
-      reasonsToKeep: ["最後の大会で着た"],
-      reasonsToLetGo: ["今後着ない"],
-      memoryToPreserve: "2回生最後の大会でチームとして初めて優勝したこと",
-      unresolved: [],
-      turnCount: 2,
-      status: "ready_for_decision",
-    });
-
-    expect(result.memory).toContain("優勝");
-    expect(result.tags).toContain("サークル");
-  });
-
-  it("falls back to a minimal record when there is no reflection state", async () => {
-    messagesCreateMock.mockResolvedValue({
-      content: [
-        {
-          type: "tool_use",
-          name: "save_memory_record",
-          input: { memory: "特に記録なし", tags: [] },
-        },
-      ],
-    });
-
-    const { generateMemoryRecordText } = await import("./memory-record-generator");
-    const result = await generateMemoryRecordText("小説 3冊セット", null);
-    expect(result.memory).toBeTruthy();
+    const result = await generateMemoryRecordText("Tシャツ", null);
+    expect(result.memory).toBe("大切な思い出");
+    expect(result.tags).toEqual(["旅行"]);
   });
 });

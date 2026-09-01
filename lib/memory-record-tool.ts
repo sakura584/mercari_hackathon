@@ -1,14 +1,13 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import type { FunctionDeclaration } from "@google/genai";
 
-export const SAVE_MEMORY_RECORD_TOOL: Anthropic.Tool = {
+export const SAVE_MEMORY_RECORD_TOOL: FunctionDeclaration = {
   name: "save_memory_record",
-  description:
-    "手放すと決めた所有物について、ユーザーが残したい思い出や手放した理由をアルバム用の文章として整える",
-  input_schema: {
+  description: "手放す品の思い出を、アルバム表示用の短い記録に整理する。",
+  parametersJsonSchema: {
     type: "object",
     properties: {
-      episode: { type: "string", description: "アルバムに表示する短いエピソード文" },
-      memory: { type: "string", description: "残しておきたい記憶・意味" },
+      episode: { type: "string" },
+      memory: { type: "string" },
       reasonForLettingGo: { type: "string" },
       tags: { type: "array", items: { type: "string" } },
     },

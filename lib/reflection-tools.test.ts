@@ -18,16 +18,16 @@ function stateWithTurnCount(turnCount: number): ReflectionState {
 describe("resolveToolChoice", () => {
   it("allows either tool before the turn limit", () => {
     const choice = resolveToolChoice(stateWithTurnCount(MAX_REFLECTION_TURNS - 1));
-    expect(choice).toEqual({ type: "any" });
+    expect(choice).toEqual(["ask_question", "complete_reflection"]);
   });
 
   it("forces complete_reflection once the turn limit is reached", () => {
     const choice = resolveToolChoice(stateWithTurnCount(MAX_REFLECTION_TURNS));
-    expect(choice).toEqual({ type: "tool", name: "complete_reflection" });
+    expect(choice).toEqual(["complete_reflection"]);
   });
 
   it("forces complete_reflection beyond the turn limit", () => {
     const choice = resolveToolChoice(stateWithTurnCount(MAX_REFLECTION_TURNS + 5));
-    expect(choice).toEqual({ type: "tool", name: "complete_reflection" });
+    expect(choice).toEqual(["complete_reflection"]);
   });
 });

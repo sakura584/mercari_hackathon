@@ -1,19 +1,15 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import type { FunctionDeclaration } from "@google/genai";
 import type { ReflectionState } from "./types";
 
 export const MAX_REFLECTION_TURNS = 3;
 
-export const ASK_QUESTION_TOOL: Anthropic.Tool = {
+export const ASK_QUESTION_TOOL: FunctionDeclaration = {
   name: "ask_question",
-  description:
-    "判断材料としてまだ不足している最も重要な点について、ユーザーに1つだけ質問する",
-  input_schema: {
+  description: "共感を示した上で、手放すか考えるための質問を一つだけ返す。",
+  parametersJsonSchema: {
     type: "object",
     properties: {
-      reflection: {
-        type: "string",
-        description: "直前の回答への短い言い換え・仮説的な共感の一文",
-      },
+      reflection: { type: "string" },
       question: { type: "string" },
       statePatch: {
         type: "object",
@@ -32,10 +28,10 @@ export const ASK_QUESTION_TOOL: Anthropic.Tool = {
   },
 };
 
-export const COMPLETE_REFLECTION_TOOL: Anthropic.Tool = {
+export const COMPLETE_REFLECTION_TOOL: FunctionDeclaration = {
   name: "complete_reflection",
-  description: "判断材料が十分に整理できたので対話を終了し、要約を返す",
-  input_schema: {
+  description: "対話を終え、最終判断のための要約を返す。",
+  parametersJsonSchema: {
     type: "object",
     properties: {
       reflection: { type: "string" },
@@ -55,9 +51,8 @@ export const COMPLETE_REFLECTION_TOOL: Anthropic.Tool = {
   },
 };
 
-export function resolveToolChoice(state: ReflectionState): Anthropic.ToolChoice {
-  if (state.turnCount >= MAX_REFLECTION_TURNS) {
-    return { type: "tool", name: "complete_reflection" };
-  }
-  return { type: "any" };
+export function resolveToolChoice(state: ReflectionState): string[] {
+  return state.turnCount >= MAX_REFLECTION_TURNS
+    ? ["complete_reflection"]
+    : ["ask_question", "complete_reflection"];
 }
