@@ -4,6 +4,8 @@ import { useState } from "react";
 import { apiClient, isMockMode, resizeImageToBase64 } from "@/lib/api-client";
 import { useSessionId } from "@/hooks/useSessionId";
 import type { Item, PurposeType } from "@/lib/types";
+import { createInitialCollections } from "@/lib/collection-mock-data";
+import type { CollectionPost } from "@/lib/collection-types";
 import { HomeScreen } from "./screens/HomeScreen";
 import { IntroScreen } from "./screens/IntroScreen";
 import { LoadingScreen } from "./screens/LoadingScreen";
@@ -11,14 +13,17 @@ import { DeckScreen } from "./screens/DeckScreen";
 import { FinalScreen } from "./screens/FinalScreen";
 import { PlanScreen } from "./screens/PlanScreen";
 import { AlbumScreen } from "./screens/AlbumScreen";
+import { CollectionApp } from "./collection/CollectionApp";
 
-type Screen = "home" | "intro" | "loading" | "deck" | "final" | "dialogue" | "plan" | "album";
+type Screen = "home" | "intro" | "loading" | "deck" | "final" | "dialogue" | "plan" | "album" | "collection";
 
 export function DeclutterApp() {
   const [screen, setScreen] = useState<Screen>("home");
   const [sessionId, setSessionId] = useSessionId();
   const [targetAmount, setTargetAmount] = useState(10000);
   const [items, setItems] = useState<Item[]>([]);
+  const [collectionEntry, setCollectionEntry] = useState<"create" | "mypage">("mypage");
+  const [collections, setCollections] = useState<CollectionPost[]>(createInitialCollections);
 
   async function handleIntroSubmit(input: {
     purposeType: PurposeType;
@@ -47,7 +52,30 @@ export function DeclutterApp() {
   }
 
   if (screen === "home") {
-    return <HomeScreen onStart={() => setScreen("intro")} />;
+    return (
+      <HomeScreen
+        onStart={() => setScreen("intro")}
+        onOpenCollectionCreate={() => {
+          setCollectionEntry("create");
+          setScreen("collection");
+        }}
+        onOpenCollectionMyPage={() => {
+          setCollectionEntry("mypage");
+          setScreen("collection");
+        }}
+      />
+    );
+  }
+
+  if (screen === "collection") {
+    return (
+      <CollectionApp
+        initialScreen={collectionEntry}
+        onExit={() => setScreen("home")}
+        collections={collections}
+        onCollectionsChange={setCollections}
+      />
+    );
   }
 
   if (screen === "intro") {
