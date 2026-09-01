@@ -9,9 +9,9 @@ const VALID_DECISIONS: FinalDecision[] = ["keep", "let_go", "hold"];
 
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ sessionId: string; itemId: string }> }
+  { params }: { params: Promise<{ collectionId: string; itemId: string }> }
 ): Promise<Response> {
-  const { sessionId, itemId } = await params;
+  const { collectionId, itemId } = await params;
   const body = await request.json().catch(() => null);
 
   if (!body || !VALID_DECISIONS.includes(body.decision) || !body.itemName || !body.imageUrl) {
@@ -21,16 +21,16 @@ export async function POST(
     );
   }
 
-  await updateItemDecision(sessionId, itemId, body.decision);
+  await updateItemDecision(collectionId, itemId, body.decision);
 
   if (body.decision !== "let_go") {
     return NextResponse.json({ decision: body.decision }, { status: 200 });
   }
 
-  const reflectionState = await getReflectionState(sessionId, itemId);
+  const reflectionState = await getReflectionState(collectionId, itemId);
   const text = await generateMemoryRecordText(body.itemName, reflectionState);
 
-  const albumEntry = await createAlbumEntry(sessionId, {
+  const albumEntry = await createAlbumEntry(collectionId, {
     itemId,
     itemName: body.itemName,
     imageUrl: body.imageUrl,

@@ -10,11 +10,11 @@ import type { ReflectionState } from "@/lib/types";
 type AskInput = { reflection: string; question: string; statePatch?: Partial<ReflectionState> };
 type CompleteInput = { reflection: string; summary?: Partial<ReflectionState> };
 
-export async function POST(request: Request, { params }: { params: Promise<{ sessionId: string; itemId: string }> }): Promise<Response> {
-  const { sessionId, itemId } = await params;
+export async function POST(request: Request, { params }: { params: Promise<{ collectionId: string; itemId: string }> }): Promise<Response> {
+  const { collectionId, itemId } = await params;
   const body = await request.json().catch(() => null);
   if (!body?.message) return NextResponse.json({ error: "message is required" }, { status: 400 });
-  const currentState = await getReflectionState(sessionId, itemId);
+  const currentState = await getReflectionState(collectionId, itemId);
   if (!currentState) return NextResponse.json({ error: "reflection not found" }, { status: 404 });
   const response = await getGeminiClient().models.generateContent({
     model: GEMINI_MODEL,
@@ -33,8 +33,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
   if (functionCall.name === "ask_question") {
     const input = functionCall.args as AskInput;
     const nextState = applyStatePatch(currentState, input.statePatch ?? {});
-    await saveReflectionState(sessionId, itemId, nextState);
-    await appendReflectionTurn(sessionId, itemId, {
+    await saveReflectionState(collectionId, itemId, nextState);
+    await appendReflectionTurn(collectionId, itemId, {
       turnIndex: nextState.turnCount, userMessage: body.message, assistantAction: "ask",
       assistantReflectionText: input.reflection, question: input.question, createdAt: new Date().toISOString(),
     });
@@ -45,8 +45,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
   }
   const input = functionCall.args as CompleteInput;
   const nextState = applyStatePatch({ ...currentState, status: "ready_for_decision" }, input.summary ?? {});
-  await saveReflectionState(sessionId, itemId, nextState);
-  await appendReflectionTurn(sessionId, itemId, {
+  await saveReflectionState(collectionId, itemId, nextState);
+  await appendReflectionTurn(collectionId, itemId, {
     turnIndex: nextState.turnCount, userMessage: body.message, assistantAction: "complete",
     assistantReflectionText: input.reflection, createdAt: new Date().toISOString(),
   });

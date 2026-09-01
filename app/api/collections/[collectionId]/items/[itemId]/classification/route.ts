@@ -6,9 +6,9 @@ const VALID_CLASSIFICATIONS: ItemClassification[] = ["keep", "unsure", "releasea
 
 export async function PATCH(
   request: Request,
-  { params }: { params: Promise<{ sessionId: string; itemId: string }> }
+  { params }: { params: Promise<{ collectionId: string; itemId: string }> }
 ): Promise<Response> {
-  const { sessionId, itemId } = await params;
+  const { collectionId, itemId } = await params;
   const body = await request.json().catch(() => null);
 
   if (!body || !VALID_CLASSIFICATIONS.includes(body.classification)) {
@@ -18,6 +18,6 @@ export async function PATCH(
     );
   }
 
-  await updateItemClassification(sessionId, itemId, body.classification);
+  await updateItemClassification(collectionId, itemId, body.classification);
   return new Response(null, { status: 204 });
 }

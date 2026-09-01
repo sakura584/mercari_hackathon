@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { createSession } from "@/lib/repositories/session-repository";
+import { createCollection } from "@/lib/repositories/collection-repository";
 import { createAlbumEntry } from "@/lib/repositories/album-repository";
 import { GET } from "./route";
 
 describe("GET album", () => {
-  it("returns album entries for the session", async () => {
-    const session = await createSession({ purposeType: "declutter" });
-    await createAlbumEntry(session.id, {
+  it("returns album entries for the collection", async () => {
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
+    await createAlbumEntry(collection.id, {
       itemId: "item_001",
       itemName: "サークルTシャツ",
       imageUrl: "https://example.com/x.jpg",
@@ -15,7 +15,7 @@ describe("GET album", () => {
     });
 
     const res = await GET(new Request("http://localhost/api/album"), {
-      params: Promise.resolve({ sessionId: session.id }),
+      params: Promise.resolve({ collectionId: collection.id }),
     });
 
     expect(res.status).toBe(200);
@@ -25,9 +25,9 @@ describe("GET album", () => {
   });
 
   it("returns an empty array when there are no entries", async () => {
-    const session = await createSession({ purposeType: "declutter" });
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
     const res = await GET(new Request("http://localhost/api/album"), {
-      params: Promise.resolve({ sessionId: session.id }),
+      params: Promise.resolve({ collectionId: collection.id }),
     });
     const body = await res.json();
     expect(body.entries).toEqual([]);

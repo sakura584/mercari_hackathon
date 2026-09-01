@@ -3,9 +3,9 @@ import { listAlbumEntries } from "@/lib/repositories/album-repository";
 
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ sessionId: string }> }
+  { params }: { params: Promise<{ collectionId: string }> }
 ): Promise<Response> {
-  const { sessionId } = await params;
-  const entries = await listAlbumEntries(sessionId);
+  const { collectionId } = await params;
+  const entries = await listAlbumEntries(collectionId);
   return NextResponse.json({ entries }, { status: 200 });
 }
