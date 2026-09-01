@@ -2,6 +2,7 @@ export type Collection = {
   id: string;
   ownerName: string;
   title: string;
+  body?: string;
   coverImageUrl?: string;
   createdAt: string;
   likeCount: number;

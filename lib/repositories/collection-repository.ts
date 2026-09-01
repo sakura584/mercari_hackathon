@@ -5,6 +5,7 @@ import type { Collection } from "../types";
 export async function createCollection(input: {
   ownerName: string;
   title: string;
+  body?: string;
   coverImageUrl?: string;
 }): Promise<Collection> {
   const db = getAdminFirestore();
@@ -13,12 +14,26 @@ export async function createCollection(input: {
     id: ref.id,
     ownerName: input.ownerName,
     title: input.title,
+    body: input.body,
     coverImageUrl: input.coverImageUrl,
     createdAt: new Date().toISOString(),
     likeCount: 0,
   };
   await ref.set(collection);
   return collection;
+}
+
+export async function updateCollection(
+  collectionId: string,
+  input: { title?: string; body?: string; coverImageUrl?: string }
+): Promise<void> {
+  const db = getAdminFirestore();
+  const updates: Record<string, string> = {};
+  if (input.title !== undefined) updates.title = input.title;
+  if (input.body !== undefined) updates.body = input.body;
+  if (input.coverImageUrl !== undefined) updates.coverImageUrl = input.coverImageUrl;
+  if (Object.keys(updates).length === 0) return;
+  await db.doc(collectionPath(collectionId)).update(updates);
 }
 
 export async function getCollection(collectionId: string): Promise<Collection | null> {

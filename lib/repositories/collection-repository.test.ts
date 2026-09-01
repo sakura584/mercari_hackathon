@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createCollection, getCollection, listCollections } from "./collection-repository";
+import { createCollection, getCollection, listCollections, updateCollection } from "./collection-repository";
 
 describe("collection-repository", () => {
   it("creates a collection and reads it back", async () => {
@@ -26,5 +26,19 @@ describe("collection-repository", () => {
     const collections = await listCollections();
     const ids = collections.map((c) => c.id);
     expect(ids.indexOf(second.id)).toBeLessThan(ids.indexOf(first.id));
+  });
+
+  it("updates title, body, and coverImageUrl", async () => {
+    const collection = await createCollection({ ownerName: "A", title: "仮タイトル" });
+    await updateCollection(collection.id, {
+      title: "在宅ワークの机まわり",
+      body: "長時間座っても疲れにくい椅子を探しました。",
+      coverImageUrl: "https://example.com/desk.jpg",
+    });
+
+    const fetched = await getCollection(collection.id);
+    expect(fetched?.title).toBe("在宅ワークの机まわり");
+    expect(fetched?.body).toBe("長時間座っても疲れにくい椅子を探しました。");
+    expect(fetched?.coverImageUrl).toBe("https://example.com/desk.jpg");
   });
 });
