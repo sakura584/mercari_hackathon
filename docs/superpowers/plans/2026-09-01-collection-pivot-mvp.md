@@ -33,11 +33,11 @@
 
 **Interfaces:**
 - Consumes: なし
-- Produces: `Collection`、`ReleaseCandidate`、`Like`型（`Session`/`PurposeType`は削除）。`collectionPath(collectionId)`、`itemsCollectionPath(collectionId)`、`itemPath(collectionId, itemId)`、`reflectionPath(collectionId, itemId)`、`reflectionTurnsCollectionPath(collectionId, itemId)`、`albumCollectionPath(collectionId)`、`albumEntryPath(collectionId, memoryRecordId)`、`likesCollectionPath(collectionId)`、`likePath(collectionId, likerId)`（以降の全タスクが使う）
+- Produces: `Collection`、`ReleaseCandidate`、`Like`、`BuyRequest`、`Comment`型（`Session`/`PurposeType`は削除）。`collectionPath(collectionId)`、`itemsCollectionPath(collectionId)`、`itemPath(collectionId, itemId)`、`reflectionPath(collectionId, itemId)`、`reflectionTurnsCollectionPath(collectionId, itemId)`、`albumCollectionPath(collectionId)`、`albumEntryPath(collectionId, memoryRecordId)`、`likesCollectionPath(collectionId)`、`likePath(collectionId, likerId)`、`buyRequestsCollectionPath(collectionId)`、`buyRequestPath(collectionId, buyRequestId)`、`commentsCollectionPath(collectionId)`、`commentPath(collectionId, commentId)`（以降の全タスクが使う）
 
 - [ ] **Step 1: `lib/types.ts`を書き換える**
 
-`Session`/`PurposeType`を削除し、`Collection`・`ReleaseCandidate`・`Like`を追加、`Item`の`sessionId`を`collectionId`に変更する。
+`Session`/`PurposeType`を削除し、`Collection`・`ReleaseCandidate`・`Like`・`BuyRequest`・`Comment`を追加、`Item`の`sessionId`を`collectionId`に変更しピン座標`x`/`y`を追加する。
 
 ```ts
 export type Collection = {
@@ -62,6 +62,8 @@ export type Item = {
   estimatedPrice?: number;
   initialClassification?: ItemClassification;
   finalDecision?: FinalDecision;
+  x?: number;
+  y?: number;
 };
 
 export type AttachmentType =
@@ -125,6 +127,27 @@ export type Like = {
   collectionId: string;
   createdAt: string;
 };
+
+export type BuyRequestStatus = "pending" | "declined" | "listed";
+
+export type BuyRequest = {
+  id: string;
+  collectionId: string;
+  itemId: string;
+  itemName: string;
+  fromName: string;
+  price: number;
+  status: BuyRequestStatus;
+  createdAt: string;
+};
+
+export type Comment = {
+  id: string;
+  collectionId: string;
+  authorName: string;
+  text: string;
+  createdAt: string;
+};
 ```
 
 - [ ] **Step 2: `lib/firestore-paths.test.ts`を新しいパス名に書き換える**
@@ -141,6 +164,10 @@ import {
   albumEntryPath,
   likesCollectionPath,
   likePath,
+  buyRequestsCollectionPath,
+  buyRequestPath,
+  commentsCollectionPath,
+  commentPath,
 } from "./firestore-paths";
 
 describe("firestore-paths", () => {
@@ -168,6 +195,16 @@ describe("firestore-paths", () => {
   it("builds likes collection and like path", () => {
     expect(likesCollectionPath("c1")).toBe("collections/c1/likes");
     expect(likePath("c1", "liker1")).toBe("collections/c1/likes/liker1");
+  });
+
+  it("builds buy-requests collection and entry path", () => {
+    expect(buyRequestsCollectionPath("c1")).toBe("collections/c1/buy-requests");
+    expect(buyRequestPath("c1", "b1")).toBe("collections/c1/buy-requests/b1");
+  });
+
+  it("builds comments collection and entry path", () => {
+    expect(commentsCollectionPath("c1")).toBe("collections/c1/comments");
+    expect(commentPath("c1", "cm1")).toBe("collections/c1/comments/cm1");
   });
 });
 ```
@@ -218,12 +255,28 @@ export function likesCollectionPath(collectionId: string): string {
 export function likePath(collectionId: string, likerId: string): string {
   return `collections/${collectionId}/likes/${likerId}`;
 }
+
+export function buyRequestsCollectionPath(collectionId: string): string {
+  return `collections/${collectionId}/buy-requests`;
+}
+
+export function buyRequestPath(collectionId: string, buyRequestId: string): string {
+  return `collections/${collectionId}/buy-requests/${buyRequestId}`;
+}
+
+export function commentsCollectionPath(collectionId: string): string {
+  return `collections/${collectionId}/comments`;
+}
+
+export function commentPath(collectionId: string, commentId: string): string {
+  return `collections/${collectionId}/comments/${commentId}`;
+}
 ```
 
 - [ ] **Step 5: テストを実行し成功を確認する**
 
 Run: `npx vitest run lib/firestore-paths.test.ts`
-Expected: PASS（6 tests）
+Expected: PASS（8 tests）
 
 - [ ] **Step 6: 型チェックを確認する（この時点でtypes.ts/firestore-pathsに依存する既存ファイルがエラーになるのは想定通り）**
 
@@ -518,6 +571,21 @@ describe("item-repository", () => {
     expect(updated.initialClassification).toBe("unsure");
     expect(updated.finalDecision).toBe("let_go");
   });
+
+  it("stores pin coordinates when provided", async () => {
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
+    const item = await createItem({
+      collectionId: collection.id,
+      imageUrl: "https://example.com/lamp.jpg",
+      title: "フロアランプ",
+      category: "default",
+      x: 30,
+      y: 42,
+    });
+
+    expect(item.x).toBe(30);
+    expect(item.y).toBe(42);
+  });
 });
 ```
 
@@ -656,6 +724,8 @@ export async function createItem(input: {
   sourceImageId?: string;
   title: string;
   category: string;
+  x?: number;
+  y?: number;
 }): Promise<Item> {
   const db = getAdminFirestore();
   const ref = db.collection(itemsCollectionPath(input.collectionId)).doc();
@@ -667,6 +737,8 @@ export async function createItem(input: {
     title: input.title,
     category: input.category,
     estimatedPrice: estimatePrice(input.category),
+    x: input.x,
+    y: input.y,
   };
   await ref.set(item);
   return item;
@@ -784,7 +856,7 @@ export async function listAlbumEntries(collectionId: string): Promise<MemoryReco
 - [ ] **Step 6: テストを実行し成功を確認する**
 
 Run: `FIRESTORE_EMULATOR_HOST=localhost:8080 FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199 npx vitest run lib/repositories`
-Expected: PASS（collection-repository 3 + item-repository 2 + reflection-repository 4 + album-repository 2 = 11 tests）
+Expected: PASS（collection-repository 3 + item-repository 3 + reflection-repository 4 + album-repository 2 = 12 tests）
 
 - [ ] **Step 7: Commit**
 
@@ -1318,15 +1390,47 @@ git commit -m "feat: コレクション詳細取得APIを追加する"
 
 ---
 
-## Task 6: 画像抽出APIの更新（collectionId化 + 単品/コレクション全体モード）
+## Task 6: 画像抽出APIの更新（collectionId化 + 単品/コレクション全体モード + ピン座標）
 
 **Files:**
 - Modify: `lib/storage.ts`, `lib/storage.test.ts`
+- Modify: `lib/extraction-tools.ts`（ピン座標`x`/`y`を追加）
 - Modify: `app/api/items/extract/route.ts`, `app/api/items/extract/route.test.ts`
 
 **Interfaces:**
-- Consumes: `EXTRACT_ITEMS_SCHEMA`（`lib/extraction-tools.ts`、変更なし）、`FALLBACK_EXTRACTED_ITEMS`（`lib/extraction-fallback.ts`、変更なし）、`createItem`（`lib/repositories/item-repository.ts`）
-- Produces: `uploadRoomImage(collectionId, imageBase64, mimeType): Promise<string>`（`lib/storage.ts`）。`POST`ハンドラ。Request body `{ collectionId: string; imageBase64: string; mimeType: string; mode?: "single" | "collection" }` → Response `{ items: Item[] }`（201）
+- Consumes: `EXTRACT_ITEMS_SCHEMA`（`lib/extraction-tools.ts`。本タスクで`x`/`y`を追加する）、`FALLBACK_EXTRACTED_ITEMS`（`lib/extraction-fallback.ts`、変更なし）、`createItem`（`lib/repositories/item-repository.ts`）
+- Produces: `uploadRoomImage(collectionId, imageBase64, mimeType): Promise<string>`（`lib/storage.ts`）。`POST`ハンドラ。Request body `{ collectionId: string; imageBase64: string; mimeType: string; mode?: "single" | "collection" }` → Response `{ items: Item[] }`（201、各itemに`x`/`y`が含まれうる）
+
+- [ ] **Step 0: `lib/extraction-tools.ts`に`x`/`y`を追加する**
+
+```ts
+export const EXTRACT_ITEMS_SCHEMA = {
+  type: "object",
+  properties: {
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          category: { type: "string" },
+          confidence: { type: "number" },
+          x: {
+            type: "number",
+            description: "写真の左上を原点とした対象物の中心のおおよその横位置（0〜100のパーセンテージ）",
+          },
+          y: {
+            type: "number",
+            description: "写真の左上を原点とした対象物の中心のおおよその縦位置（0〜100のパーセンテージ）",
+          },
+        },
+        required: ["title", "category"],
+      },
+    },
+  },
+  required: ["items"],
+};
+```
 
 - [ ] **Step 1: `lib/storage.test.ts`を書き換える（引数名の意味だけ変える。挙動は変わらない）**
 
@@ -1401,6 +1505,18 @@ describe("POST /api/items/extract", () => {
     expect((await res.json()).items).toHaveLength(2);
   });
 
+  it("passes through pin coordinates when Gemini returns them", async () => {
+    generateContentMock.mockResolvedValue({
+      text: JSON.stringify({ items: [{ title: "フィギュア", category: "figure", x: 30, y: 62 }] }),
+    });
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
+    const { POST } = await import("./route");
+    const res = await POST(request({ collectionId: collection.id, imageBase64: "abc", mimeType: "image/png" }));
+    const body = await res.json();
+    expect(body.items[0].x).toBe(30);
+    expect(body.items[0].y).toBe(62);
+  });
+
   it("keeps only the highest-confidence item in single mode when Gemini returns more than one", async () => {
     generateContentMock.mockResolvedValue({
       text: JSON.stringify({
@@ -1452,7 +1568,13 @@ import { uploadRoomImage } from "@/lib/storage";
 import { createItem } from "@/lib/repositories/item-repository";
 import type { Item } from "@/lib/types";
 
-type ExtractedCandidate = { title: string; category: string; confidence?: number };
+type ExtractedCandidate = {
+  title: string;
+  category: string;
+  confidence?: number;
+  x?: number;
+  y?: number;
+};
 type ExtractMode = "single" | "collection";
 
 async function extractCandidates(
@@ -1509,6 +1631,8 @@ export async function POST(request: Request): Promise<Response> {
         imageUrl,
         title: candidate.title,
         category: candidate.category,
+        x: candidate.x,
+        y: candidate.y,
       })
     );
   }
@@ -1520,13 +1644,14 @@ export async function POST(request: Request): Promise<Response> {
 - [ ] **Step 6: テストを実行し成功を確認する**
 
 Run: `FIRESTORE_EMULATOR_HOST=localhost:8080 FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199 npx vitest run`
-Expected: PASS（全テスト。抽出APIの4 testsを含む）
+Expected: PASS（全テスト。抽出APIの5 testsを含む）
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add lib/storage.ts lib/storage.test.ts app/api/items/extract/route.ts app/api/items/extract/route.test.ts
-git commit -m "feat: 画像抽出APIをcollectionId化し、単品/コレクション全体モードを追加する"
+git add lib/storage.ts lib/storage.test.ts lib/extraction-tools.ts \
+  app/api/items/extract/route.ts app/api/items/extract/route.test.ts
+git commit -m "feat: 画像抽出APIをcollectionId化し、単品/コレクション全体モード・ピン座標を追加する"
 ```
 
 ---
@@ -1979,9 +2104,555 @@ git commit -m "feat: コレクションへのいいね機能を追加する"
 
 ---
 
+## Task 9: 「買いたい」申し出（BuyRequest）とコメント機能（UIプロトタイプとの整合）
+
+UIプロトタイプ（`collection.html`）の「お知らせ」画面・コメント機能に対応する。spec 11節参照。「お知らせ」画面でどちらのトリガー（本タスクのBuyRequest／Task 7のsuggest-release）を優先表示するか、いつ呼ぶかはUI側の判断でありこのタスクの範囲外。バックエンドは一覧・作成のAPIを提供するだけでよい。
+
+**Files:**
+- Create: `lib/repositories/buy-request-repository.ts`, `lib/repositories/buy-request-repository.test.ts`
+- Create: `lib/repositories/comment-repository.ts`, `lib/repositories/comment-repository.test.ts`
+- Create: `app/api/collections/[collectionId]/items/[itemId]/buy-requests/route.ts`, `.../route.test.ts`
+- Create: `app/api/collections/[collectionId]/buy-requests/route.ts`, `.../route.test.ts`
+- Create: `app/api/collections/[collectionId]/comments/route.ts`, `.../route.test.ts`
+- Modify: `app/api/collections/[collectionId]/route.ts`, `.../route.test.ts`（Task 5で作成したもの。レスポンスに`comments`を追加する）
+
+**Interfaces:**
+- Consumes: `buyRequestsCollectionPath`、`buyRequestPath`、`commentsCollectionPath`、`commentPath`（`lib/firestore-paths.ts`）、`listItems`（`lib/repositories/item-repository.ts`）
+- Produces: `createBuyRequest(input)`、`listPendingBuyRequests(collectionId)`、`updateBuyRequestStatus(collectionId, buyRequestId, status)`（`lib/repositories/buy-request-repository.ts`）。`createComment(input)`、`listComments(collectionId)`（`lib/repositories/comment-repository.ts`）
+
+- [ ] **Step 1: 失敗するテストを書く（BuyRequestリポジトリ）**
+
+`lib/repositories/buy-request-repository.test.ts`:
+
+```ts
+import { describe, expect, it } from "vitest";
+import { createCollection } from "./collection-repository";
+import { createItem } from "./item-repository";
+import {
+  createBuyRequest,
+  listPendingBuyRequests,
+  updateBuyRequestStatus,
+} from "./buy-request-repository";
+
+describe("buy-request-repository", () => {
+  it("creates a pending buy request and lists it", async () => {
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
+    const item = await createItem({
+      collectionId: collection.id,
+      imageUrl: "https://example.com/lamp.jpg",
+      title: "フロアランプ",
+      category: "default",
+    });
+
+    const buyRequest = await createBuyRequest({
+      collectionId: collection.id,
+      itemId: item.id,
+      itemName: item.title,
+      fromName: "たなか",
+      price: 3000,
+    });
+
+    expect(buyRequest.status).toBe("pending");
+
+    const pending = await listPendingBuyRequests(collection.id);
+    expect(pending).toHaveLength(1);
+    expect(pending[0].id).toBe(buyRequest.id);
+  });
+
+  it("excludes non-pending buy requests from the list", async () => {
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
+    const item = await createItem({
+      collectionId: collection.id,
+      imageUrl: "https://example.com/lamp.jpg",
+      title: "フロアランプ",
+      category: "default",
+    });
+    const buyRequest = await createBuyRequest({
+      collectionId: collection.id,
+      itemId: item.id,
+      itemName: item.title,
+      fromName: "たなか",
+      price: 3000,
+    });
+
+    await updateBuyRequestStatus(collection.id, buyRequest.id, "declined");
+
+    expect(await listPendingBuyRequests(collection.id)).toEqual([]);
+  });
+});
+```
+
+- [ ] **Step 2: テストを実行し失敗を確認する**
+
+Run: `FIRESTORE_EMULATOR_HOST=localhost:8080 FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199 npx vitest run lib/repositories/buy-request-repository.test.ts`
+Expected: FAIL（`./buy-request-repository` module not found）
+
+- [ ] **Step 3: 実装を書く**
+
+`lib/repositories/buy-request-repository.ts`:
+
+```ts
+import { getAdminFirestore } from "../firebase/admin";
+import { buyRequestPath, buyRequestsCollectionPath } from "../firestore-paths";
+import type { BuyRequest, BuyRequestStatus } from "../types";
+
+export async function createBuyRequest(input: {
+  collectionId: string;
+  itemId: string;
+  itemName: string;
+  fromName: string;
+  price: number;
+}): Promise<BuyRequest> {
+  const db = getAdminFirestore();
+  const ref = db.collection(buyRequestsCollectionPath(input.collectionId)).doc();
+  const buyRequest: BuyRequest = {
+    id: ref.id,
+    collectionId: input.collectionId,
+    itemId: input.itemId,
+    itemName: input.itemName,
+    fromName: input.fromName,
+    price: input.price,
+    status: "pending",
+    createdAt: new Date().toISOString(),
+  };
+  await ref.set(buyRequest);
+  return buyRequest;
+}
+
+export async function listPendingBuyRequests(collectionId: string): Promise<BuyRequest[]> {
+  const db = getAdminFirestore();
+  const snapshot = await db.collection(buyRequestsCollectionPath(collectionId)).get();
+  return snapshot.docs
+    .map((doc) => doc.data() as BuyRequest)
+    .filter((buyRequest) => buyRequest.status === "pending")
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function updateBuyRequestStatus(
+  collectionId: string,
+  buyRequestId: string,
+  status: BuyRequestStatus
+): Promise<void> {
+  const db = getAdminFirestore();
+  await db.doc(buyRequestPath(collectionId, buyRequestId)).update({ status });
+}
+```
+
+> in-memoryフィルタ・ソートにしているのは、Firestoreの`where`+`orderBy`の組み合わせが本番では複合インデックスを要求するため。ハッカソン規模の件数であればこれで十分。
+
+- [ ] **Step 4: テストを実行し成功を確認する**
+
+Run: `FIRESTORE_EMULATOR_HOST=localhost:8080 FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199 npx vitest run lib/repositories/buy-request-repository.test.ts`
+Expected: PASS（2 tests）
+
+- [ ] **Step 5: 失敗するテストを書く（Commentリポジトリ）**
+
+`lib/repositories/comment-repository.test.ts`:
+
+```ts
+import { describe, expect, it } from "vitest";
+import { createCollection } from "./collection-repository";
+import { createComment, listComments } from "./comment-repository";
+
+describe("comment-repository", () => {
+  it("creates a comment and lists it back", async () => {
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
+
+    await createComment({ collectionId: collection.id, authorName: "あおい", text: "ランプどこのですか？" });
+
+    const comments = await listComments(collection.id);
+    expect(comments).toHaveLength(1);
+    expect(comments[0].authorName).toBe("あおい");
+    expect(comments[0].text).toBe("ランプどこのですか？");
+  });
+
+  it("returns an empty array when there are no comments", async () => {
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
+    expect(await listComments(collection.id)).toEqual([]);
+  });
+});
+```
+
+- [ ] **Step 6: テストを実行し失敗を確認する**
+
+Run: `FIRESTORE_EMULATOR_HOST=localhost:8080 FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199 npx vitest run lib/repositories/comment-repository.test.ts`
+Expected: FAIL（`./comment-repository` module not found）
+
+- [ ] **Step 7: 実装を書く**
+
+`lib/repositories/comment-repository.ts`:
+
+```ts
+import { getAdminFirestore } from "../firebase/admin";
+import { commentPath, commentsCollectionPath } from "../firestore-paths";
+import type { Comment } from "../types";
+
+export async function createComment(input: {
+  collectionId: string;
+  authorName: string;
+  text: string;
+}): Promise<Comment> {
+  const db = getAdminFirestore();
+  const ref = db.collection(commentsCollectionPath(input.collectionId)).doc();
+  const comment: Comment = {
+    id: ref.id,
+    collectionId: input.collectionId,
+    authorName: input.authorName,
+    text: input.text,
+    createdAt: new Date().toISOString(),
+  };
+  await ref.set(comment);
+  return comment;
+}
+
+export async function listComments(collectionId: string): Promise<Comment[]> {
+  const db = getAdminFirestore();
+  const snapshot = await db
+    .collection(commentsCollectionPath(collectionId))
+    .orderBy("createdAt", "asc")
+    .get();
+  return snapshot.docs.map((doc) => doc.data() as Comment);
+}
+```
+
+`commentPath`は本タスクでは未使用（Firestoreパスの一覧性のためTask 1で定義済み。個別コメントの取得・削除が必要になったら使う）。
+
+- [ ] **Step 8: テストを実行し成功を確認する**
+
+Run: `FIRESTORE_EMULATOR_HOST=localhost:8080 FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199 npx vitest run lib/repositories/comment-repository.test.ts`
+Expected: PASS（2 tests）
+
+- [ ] **Step 9: 失敗するテストを書く（API）**
+
+`app/api/collections/[collectionId]/items/[itemId]/buy-requests/route.test.ts`:
+
+```ts
+import { describe, expect, it } from "vitest";
+import { createCollection } from "@/lib/repositories/collection-repository";
+import { createItem } from "@/lib/repositories/item-repository";
+import { POST } from "./route";
+
+function jsonRequest(body: unknown): Request {
+  return new Request("http://localhost/api/buy-requests", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+describe("POST buy-requests", () => {
+  it("creates a pending buy request for the item", async () => {
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
+    const item = await createItem({
+      collectionId: collection.id,
+      imageUrl: "https://example.com/lamp.jpg",
+      title: "フロアランプ",
+      category: "default",
+    });
+
+    const res = await POST(jsonRequest({ fromName: "たなか", price: 3000 }), {
+      params: Promise.resolve({ collectionId: collection.id, itemId: item.id }),
+    });
+
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.itemName).toBe("フロアランプ");
+    expect(body.status).toBe("pending");
+  });
+
+  it("returns 404 for an unknown item", async () => {
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
+    const res = await POST(jsonRequest({ fromName: "たなか", price: 3000 }), {
+      params: Promise.resolve({ collectionId: collection.id, itemId: "does-not-exist" }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("rejects a missing price", async () => {
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
+    const item = await createItem({
+      collectionId: collection.id,
+      imageUrl: "https://example.com/lamp.jpg",
+      title: "フロアランプ",
+      category: "default",
+    });
+    const res = await POST(jsonRequest({ fromName: "たなか" }), {
+      params: Promise.resolve({ collectionId: collection.id, itemId: item.id }),
+    });
+    expect(res.status).toBe(400);
+  });
+});
+```
+
+`app/api/collections/[collectionId]/buy-requests/route.test.ts`:
+
+```ts
+import { describe, expect, it } from "vitest";
+import { createCollection } from "@/lib/repositories/collection-repository";
+import { createBuyRequest } from "@/lib/repositories/buy-request-repository";
+import { GET } from "./route";
+
+describe("GET buy-requests", () => {
+  it("returns pending buy requests for the collection", async () => {
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
+    await createBuyRequest({
+      collectionId: collection.id,
+      itemId: "item_001",
+      itemName: "フロアランプ",
+      fromName: "たなか",
+      price: 3000,
+    });
+
+    const res = await GET(new Request("http://localhost/api/buy-requests"), {
+      params: Promise.resolve({ collectionId: collection.id }),
+    });
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).buyRequests).toHaveLength(1);
+  });
+});
+```
+
+`app/api/collections/[collectionId]/comments/route.test.ts`:
+
+```ts
+import { describe, expect, it } from "vitest";
+import { createCollection } from "@/lib/repositories/collection-repository";
+import { POST } from "./route";
+
+function jsonRequest(body: unknown): Request {
+  return new Request("http://localhost/api/comments", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+describe("POST comments", () => {
+  it("creates a comment", async () => {
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
+    const res = await POST(jsonRequest({ authorName: "あおい", text: "いいですね" }), {
+      params: Promise.resolve({ collectionId: collection.id }),
+    });
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.authorName).toBe("あおい");
+  });
+
+  it("rejects an empty text", async () => {
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
+    const res = await POST(jsonRequest({ authorName: "あおい", text: "" }), {
+      params: Promise.resolve({ collectionId: collection.id }),
+    });
+    expect(res.status).toBe(400);
+  });
+});
+```
+
+- [ ] **Step 10: テストを実行し失敗を確認する**
+
+Run: `FIRESTORE_EMULATOR_HOST=localhost:8080 FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199 npx vitest run app/api/collections`
+Expected: FAIL（3つの`./route`が存在しない）
+
+- [ ] **Step 11: 3つのrouteを実装する**
+
+`app/api/collections/[collectionId]/items/[itemId]/buy-requests/route.ts`:
+
+```ts
+import { NextResponse } from "next/server";
+import { createBuyRequest } from "@/lib/repositories/buy-request-repository";
+import { listItems } from "@/lib/repositories/item-repository";
+
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ collectionId: string; itemId: string }> }
+): Promise<Response> {
+  const { collectionId, itemId } = await params;
+  const body = await request.json().catch(() => null);
+
+  if (!body || typeof body.fromName !== "string" || !body.fromName || typeof body.price !== "number") {
+    return NextResponse.json({ error: "fromName and price are required" }, { status: 400 });
+  }
+
+  const items = await listItems(collectionId);
+  const item = items.find((candidate) => candidate.id === itemId);
+  if (!item) {
+    return NextResponse.json({ error: "item not found" }, { status: 404 });
+  }
+
+  const buyRequest = await createBuyRequest({
+    collectionId,
+    itemId,
+    itemName: item.title,
+    fromName: body.fromName,
+    price: body.price,
+  });
+
+  return NextResponse.json(buyRequest, { status: 201 });
+}
+```
+
+`app/api/collections/[collectionId]/buy-requests/route.ts`:
+
+```ts
+import { NextResponse } from "next/server";
+import { listPendingBuyRequests } from "@/lib/repositories/buy-request-repository";
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ collectionId: string }> }
+): Promise<Response> {
+  const { collectionId } = await params;
+  const buyRequests = await listPendingBuyRequests(collectionId);
+  return NextResponse.json({ buyRequests }, { status: 200 });
+}
+```
+
+`app/api/collections/[collectionId]/comments/route.ts`:
+
+```ts
+import { NextResponse } from "next/server";
+import { createComment } from "@/lib/repositories/comment-repository";
+
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ collectionId: string }> }
+): Promise<Response> {
+  const { collectionId } = await params;
+  const body = await request.json().catch(() => null);
+
+  if (
+    !body ||
+    typeof body.authorName !== "string" ||
+    !body.authorName ||
+    typeof body.text !== "string" ||
+    !body.text
+  ) {
+    return NextResponse.json({ error: "authorName and text are required" }, { status: 400 });
+  }
+
+  const comment = await createComment({
+    collectionId,
+    authorName: body.authorName,
+    text: body.text,
+  });
+
+  return NextResponse.json(comment, { status: 201 });
+}
+```
+
+- [ ] **Step 12: テストを実行し成功を確認する**
+
+Run: `FIRESTORE_EMULATOR_HOST=localhost:8080 FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199 npx vitest run`
+Expected: PASS（全テスト）
+
+- [ ] **Step 13: `GET /api/collections/[collectionId]`（Task 5）にcomments追加。まず失敗するテストに直す**
+
+`app/api/collections/[collectionId]/route.test.ts`を以下に書き換える（既存の2 testsに`comments`の検証を追加）:
+
+```ts
+import { describe, expect, it } from "vitest";
+import { createCollection } from "@/lib/repositories/collection-repository";
+import { createItem } from "@/lib/repositories/item-repository";
+import { createComment } from "@/lib/repositories/comment-repository";
+import { GET } from "./route";
+
+describe("GET /api/collections/[collectionId]", () => {
+  it("returns the collection with its items and comments", async () => {
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
+    await createItem({
+      collectionId: collection.id,
+      imageUrl: "https://example.com/x.jpg",
+      title: "本",
+      category: "book",
+    });
+    await createComment({ collectionId: collection.id, authorName: "あおい", text: "いいですね" });
+
+    const res = await GET(new Request("http://localhost/api/collections/x"), {
+      params: Promise.resolve({ collectionId: collection.id }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.collection.id).toBe(collection.id);
+    expect(body.items).toHaveLength(1);
+    expect(body.comments).toHaveLength(1);
+    expect(body.comments[0].authorName).toBe("あおい");
+  });
+
+  it("returns 404 for an unknown collection", async () => {
+    const res = await GET(new Request("http://localhost/api/collections/x"), {
+      params: Promise.resolve({ collectionId: "does-not-exist" }),
+    });
+    expect(res.status).toBe(404);
+  });
+});
+```
+
+- [ ] **Step 14: テストを実行し失敗を確認する**
+
+Run: `FIRESTORE_EMULATOR_HOST=localhost:8080 FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199 npx vitest run "app/api/collections"`
+Expected: FAIL（`body.comments`が`undefined`）
+
+- [ ] **Step 15: `app/api/collections/[collectionId]/route.ts`にcomments取得を追加する**
+
+```ts
+import { NextResponse } from "next/server";
+import { getCollection } from "@/lib/repositories/collection-repository";
+import { listItems } from "@/lib/repositories/item-repository";
+import { listComments } from "@/lib/repositories/comment-repository";
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ collectionId: string }> }
+): Promise<Response> {
+  const { collectionId } = await params;
+  const collection = await getCollection(collectionId);
+
+  if (!collection) {
+    return NextResponse.json({ error: "collection not found" }, { status: 404 });
+  }
+
+  const [items, comments] = await Promise.all([
+    listItems(collectionId),
+    listComments(collectionId),
+  ]);
+
+  return NextResponse.json({ collection, items, comments }, { status: 200 });
+}
+```
+
+- [ ] **Step 16: テストを実行し成功を確認する**
+
+Run: `FIRESTORE_EMULATOR_HOST=localhost:8080 FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199 npx vitest run`
+Expected: PASS（全テスト）
+
+- [ ] **Step 17: 型チェック・ビルドを確認する**
+
+Run: `npx tsc --noEmit && npm run build`
+Expected: 両方成功
+
+- [ ] **Step 18: Commit**
+
+```bash
+git add lib/repositories/buy-request-repository.ts lib/repositories/buy-request-repository.test.ts \
+  lib/repositories/comment-repository.ts lib/repositories/comment-repository.test.ts \
+  "app/api/collections/[collectionId]/items/[itemId]/buy-requests/route.ts" \
+  "app/api/collections/[collectionId]/items/[itemId]/buy-requests/route.test.ts" \
+  "app/api/collections/[collectionId]/buy-requests/route.ts" \
+  "app/api/collections/[collectionId]/buy-requests/route.test.ts" \
+  "app/api/collections/[collectionId]/comments/route.ts" \
+  "app/api/collections/[collectionId]/comments/route.test.ts" \
+  "app/api/collections/[collectionId]/route.ts" \
+  "app/api/collections/[collectionId]/route.test.ts"
+git commit -m "feat: 買いたい申し出(BuyRequest)とコメント機能を追加し、詳細APIにcommentsを含める"
+```
+
+---
+
 ## 実行順序と注意事項
 
-Task 1〜8はこの順で依存関係があるため上から実装する。UI側（別担当）は、Task 4完了時点で`sessionId`ベースの呼び出しが型エラーになる可能性があるため、Task 4完了後に一度UI担当と同期し、APIパス変更（`/api/sessions/**` → `/api/collections/**`）とリクエスト/レスポンス形状の変更点を共有すること。
+Task 1〜9はこの順で依存関係があるため上から実装する（Task 9はTask 3のitem-repositoryとTask 5の詳細APIに依存するため最後に置いている）。UI側（別担当）は、Task 4完了時点で`sessionId`ベースの呼び出しが型エラーになる可能性があるため、Task 4完了後に一度UI担当と同期し、APIパス変更（`/api/sessions/**` → `/api/collections/**`）とリクエスト/レスポンス形状の変更点を共有すること。
 
 `lib/mock-api-client.ts`（UI側のモックモード実装）は本プランの対象外だが、Task 1のCollection型変更に伴い型エラーになる可能性がある。UI担当がモッククライアントの型を合わせる想定で、本プランでは修正しない。
 
