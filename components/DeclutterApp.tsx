@@ -21,7 +21,6 @@ export function DeclutterApp() {
 
   return (
     <HomeScreen
-      onStart={() => openCollection("create")}
       onOpenCollectionCreate={() => openCollection("create")}
       onOpenCollectionMyPage={() => openCollection("mypage")}
     />

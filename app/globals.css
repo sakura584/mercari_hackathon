@@ -546,3 +546,73 @@ input[type="number"].yen-input:focus{ outline:2px solid var(--brand); border-col
   background:rgba(20,20,20,0.85); color:#fff; padding:10px 20px; border-radius:20px;
   font-size:13px; z-index:120; white-space:nowrap;
 }
+
+/* --- ホーム画面（collection.html準拠） --- */
+.app-header{
+  padding:14px 16px 8px;
+  border-bottom:1px solid var(--line);
+  flex-shrink:0;
+}
+.logo-row{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.logo{ color:var(--brand); font-weight:900; font-size:21px; letter-spacing:-.5px; }
+.search-box{
+  flex:1;
+  background:#f4f4f4;
+  border-radius:7px;
+  padding:9px 12px;
+  color:#a3a3a3;
+  font-size:13px;
+}
+.category-tabs{
+  display:flex; gap:18px;
+  overflow-x:auto;
+  font-size:13px; color:#666;
+  white-space:nowrap;
+}
+.category-tabs::-webkit-scrollbar{ display:none; }
+.category-tabs span{ padding-bottom:8px; flex-shrink:0; }
+.category-tabs span.active{ color:var(--brand); font-weight:700; border-bottom:2px solid var(--brand); }
+
+.product-grid{
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:1px; background:var(--line);
+}
+.product-card{ background:#fff; padding:9px; }
+.product-photo{
+  width:100%; aspect-ratio:1; object-fit:cover;
+  background:#eee; border-radius:4px; margin-bottom:6px; display:block;
+}
+.product-price{ font-weight:700; font-size:14px; }
+.product-title{
+  font-size:11.5px; color:#666;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  margin-top:2px;
+}
+
+.tabbar{
+  display:flex; align-items:center;
+  border-top:1px solid var(--line);
+  background:#fff; height:70px; flex-shrink:0;
+  padding-bottom:6px;
+}
+.tabbar .tab-item{
+  flex:1; display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  gap:3px; font-size:10px; color:#a0a0a0;
+  cursor:pointer; background:none; border:none;
+}
+.tabbar .tab-item.active{ color:var(--brand); }
+.tabbar .tab-icon{ font-size:19px; line-height:1; }
+.tab-sell{ flex:1; display:flex; align-items:center; justify-content:center; }
+.tab-sell-btn{
+  width:44px; height:44px; border-radius:50%;
+  background:var(--brand); color:#fff;
+  display:flex; align-items:center; justify-content:center;
+  font-size:24px; margin-top:-10px;
+  box-shadow:0 3px 10px rgba(255,2,17,.45);
+  border:none; cursor:pointer;
+}
+.collection-icon{ position:relative; width:20px; height:16px; flex-shrink:0; }
+.collection-icon .sq{ position:absolute; border:1.6px solid currentColor; border-radius:3px; }
+.collection-icon .sq1{ width:12px; height:12px; left:0; top:0; background:#fff; }
+.collection-icon .sq2{ width:12px; height:12px; left:7px; top:3px; background:#fff; }
