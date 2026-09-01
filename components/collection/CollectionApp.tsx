@@ -1,8 +1,15 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
-import { currentUser, demoBuyer, mockExtractCandidates } from "@/lib/collection-mock-data";
-import type { CollectionDraft, CollectionPost, ItemTag, MyPageTab } from "@/lib/collection-types";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  collectionApiClient,
+  getOrCreateLikerId,
+  getStoredOwnerName,
+  resizeImageToBase64,
+  storeOwnerName,
+} from "@/lib/collection-api-client";
+import type { BuyRequest, Collection, Comment as BackendComment, Item } from "@/lib/types";
+import type { CollectionPost, DraftTag, ItemTag, MyPageTab } from "@/lib/collection-types";
 import { CollectionCreateScreen } from "./CollectionCreateScreen";
 import { CollectionMyPageScreen } from "./CollectionMyPageScreen";
 import { CollectionDetailScreen } from "./CollectionDetailScreen";
@@ -12,49 +19,170 @@ import { CollectionSellCompleteScreen } from "./CollectionSellCompleteScreen";
 
 type Screen = "create" | "mypage" | "detail" | "notification" | "sell" | "sell-complete";
 
-function emptyDraft(): CollectionDraft {
-  return { photo: null, title: "", body: "", tags: [] };
+const LIKED_IDS_KEY = "letting-go-liked-collection-ids";
+
+function readLikedIds(): Set<string> {
+  try {
+    return new Set(JSON.parse(window.localStorage.getItem(LIKED_IDS_KEY) ?? "[]"));
+  } catch {
+    return new Set();
+  }
+}
+
+function writeLikedIds(ids: Set<string>) {
+  window.localStorage.setItem(LIKED_IDS_KEY, JSON.stringify([...ids]));
+}
+
+function itemToTag(item: Item, buyRequests: BuyRequest[]): ItemTag {
+  return {
+    id: item.id,
+    x: item.x ?? 50,
+    y: item.y ?? 50,
+    name: item.title,
+    category: item.category,
+    status: item.finalDecision === "let_go" ? "出品中" : "未出品",
+    wants: buyRequests
+      .filter((r) => r.itemId === item.id)
+      .map((r) => ({ from: r.fromName, price: r.price, at: r.createdAt })),
+  };
+}
+
+function toCollectionPost(
+  collection: Collection,
+  items: Item[],
+  comments: BackendComment[],
+  buyRequests: BuyRequest[],
+  liked: boolean
+): CollectionPost {
+  return {
+    id: collection.id,
+    user: { name: collection.ownerName, avatar: collection.ownerName.charAt(0) || "?" },
+    photo: collection.coverImageUrl ?? items[0]?.imageUrl ?? null,
+    title: collection.title,
+    body: collection.body ?? "",
+    postedAt: new Date(collection.createdAt).toLocaleString("ja-JP"),
+    likes: collection.likeCount,
+    liked,
+    comments: comments.map((c) => ({ user: c.authorName, text: c.text })),
+    tags: items.map((item) => itemToTag(item, buyRequests)),
+  };
+}
+
+function emptyDraftLocal() {
+  return {
+    photoFile: null as File | null,
+    photoPreview: null as string | null,
+    title: "",
+    body: "",
+    tags: [] as DraftTag[],
+  };
 }
 
 export function CollectionApp({
   initialScreen,
   onExit,
-  collections,
-  onCollectionsChange,
 }: {
   initialScreen: "create" | "mypage";
   onExit: () => void;
-  collections: CollectionPost[];
-  onCollectionsChange: (updater: (prev: CollectionPost[]) => CollectionPost[]) => void;
 }) {
+  const [ownerName, setOwnerName] = useState("");
+  const [ownerNameLoaded, setOwnerNameLoaded] = useState(false);
+  const [ownerNameDraft, setOwnerNameDraft] = useState("");
+
+  useEffect(() => {
+    setOwnerName(getStoredOwnerName());
+    setOwnerNameLoaded(true);
+  }, []);
+
+  const likerId = useMemo(() => (typeof window !== "undefined" ? getOrCreateLikerId() : ""), []);
+
   const [screen, setScreen] = useState<Screen>(initialScreen);
-  const [draft, setDraft] = useState<CollectionDraft>(emptyDraft);
+  const [draft, setDraft] = useState(emptyDraftLocal);
+  const [draftCollectionId, setDraftCollectionId] = useState<string | null>(null);
+  const [extracting, setExtracting] = useState(false);
+  const [loadingText, setLoadingText] = useState("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [collectionPhotos, setCollectionPhotos] = useState<Record<string, string | null>>({});
+  const [collectionTagCounts, setCollectionTagCounts] = useState<Record<string, number>>({});
   const [myPageTab, setMyPageTab] = useState<MyPageTab>("collection");
+
   const [currentDetailId, setCurrentDetailId] = useState<string | null>(null);
-  const [notifTarget, setNotifTarget] = useState<{ collectionId: string; tagId: string } | null>(null);
-  const [buyTagId, setBuyTagId] = useState<string | null>(null);
+  const [detailItems, setDetailItems] = useState<Item[]>([]);
+  const [detailComments, setDetailComments] = useState<BackendComment[]>([]);
+  const [detailBuyRequests, setDetailBuyRequests] = useState<BuyRequest[]>([]);
+  const [likedIds, setLikedIds] = useState<Set<string>>(() =>
+    typeof window !== "undefined" ? readLikedIds() : new Set()
+  );
+
+  const [activeBuyItemId, setActiveBuyItemId] = useState<string | null>(null);
   const [buyPrice, setBuyPrice] = useState(3000);
   const [sheet, setSheet] = useState<"photo" | "buy" | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [extracting, setExtracting] = useState(false);
-  const [loadingText, setLoadingText] = useState("");
+
+  const [notifItem, setNotifItem] = useState<Item | null>(null);
+  const [notifBuyRequest, setNotifBuyRequest] = useState<BuyRequest | null>(null);
   const [roleSwitchVisible, setRoleSwitchVisible] = useState(false);
   const [completeMessage, setCompleteMessage] = useState("");
-  const tagIdCounter = useRef(100);
 
-  const currentDetail = collections.find((c) => c.id === currentDetailId) ?? null;
-  const notifCollection = notifTarget
-    ? collections.find((c) => c.id === notifTarget.collectionId) ?? null
+  const currentDetailCollection = collections.find((c) => c.id === currentDetailId) ?? null;
+  const currentDetailPost = currentDetailCollection
+    ? toCollectionPost(
+        currentDetailCollection,
+        detailItems,
+        detailComments,
+        detailBuyRequests,
+        likedIds.has(currentDetailCollection.id)
+      )
     : null;
-  const notifTag = notifCollection && notifTarget
-    ? notifCollection.tags.find((t) => t.id === notifTarget.tagId) ?? null
-    : null;
-  const notifWant = notifTag && notifTag.wants.length > 0 ? notifTag.wants[notifTag.wants.length - 1] : null;
-  const buyTargetTag = currentDetail?.tags.find((t) => t.id === buyTagId) ?? null;
+  const buyTargetItem = detailItems.find((i) => i.id === activeBuyItemId) ?? null;
 
   function showToast(msg: string) {
     setToast(msg);
     window.setTimeout(() => setToast(null), 1800);
+  }
+
+  async function refreshCollectionsList() {
+    const list = await collectionApiClient.listCollections();
+    setCollections(list);
+    const details = await Promise.all(list.map((c) => collectionApiClient.getCollection(c.id)));
+    const photos: Record<string, string | null> = {};
+    const counts: Record<string, number> = {};
+    list.forEach((c, i) => {
+      photos[c.id] = c.coverImageUrl ?? details[i].items[0]?.imageUrl ?? null;
+      counts[c.id] = details[i].items.length;
+    });
+    setCollectionPhotos(photos);
+    setCollectionTagCounts(counts);
+  }
+
+  async function startCreateDraft() {
+    const collection = await collectionApiClient.createCollection({
+      ownerName,
+      title: "無題のコレクション",
+    });
+    setDraftCollectionId(collection.id);
+  }
+
+  useEffect(() => {
+    if (!ownerNameLoaded || !ownerName) return;
+    if (screen === "mypage") {
+      refreshCollectionsList();
+    } else if (screen === "create" && !draftCollectionId) {
+      startCreateDraft();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, ownerNameLoaded, ownerName]);
+
+  async function openDetail(id: string) {
+    setCurrentDetailId(id);
+    setRoleSwitchVisible(false);
+    const detail = await collectionApiClient.getCollection(id);
+    setDetailItems(detail.items);
+    setDetailComments(detail.comments);
+    setDetailBuyRequests(await collectionApiClient.listPendingBuyRequests(id));
+    setScreen("detail");
   }
 
   function goToMyPage(tab: MyPageTab = "collection") {
@@ -62,46 +190,38 @@ export function CollectionApp({
     setScreen("mypage");
   }
 
-  function openDetail(id: string) {
-    setCurrentDetailId(id);
-    setRoleSwitchVisible(false);
-    setScreen("detail");
-  }
-
-  /* ---- 作成画面 ---- */
-  function setDraftPhoto(path: string) {
-    setDraft((d) => ({ ...d, photo: path }));
+  function setDraftPhotoFile(file: File) {
+    setDraft((d) => ({ ...d, photoFile: file, photoPreview: URL.createObjectURL(file) }));
     setSheet(null);
   }
 
-  function startExtraction() {
+  async function startExtraction() {
+    if (!draft.photoFile || !draftCollectionId) return;
     setExtracting(true);
-    const steps = ["写真を解析しています", "商品を認識しています", "タグを作成しています"];
-    let i = 0;
-    setLoadingText(steps[0]);
-    const interval = window.setInterval(() => {
-      i += 1;
-      if (i < steps.length) {
-        setLoadingText(steps[i]);
-        return;
-      }
-      window.clearInterval(interval);
+    setLoadingText("写真を解析しています");
+    try {
+      const { base64, mimeType } = await resizeImageToBase64(draft.photoFile);
+      setLoadingText("商品を認識しています");
+      const { items } = await collectionApiClient.extractItems({
+        collectionId: draftCollectionId,
+        imageBase64: base64,
+        mimeType,
+        mode: "collection",
+      });
       setDraft((d) => ({
         ...d,
-        tags: mockExtractCandidates.map((m) => {
-          tagIdCounter.current += 1;
-          return {
-            id: `draft${tagIdCounter.current}`,
-            x: m.x,
-            y: m.y,
-            name: m.name,
-            category: m.category,
-            included: true,
-          };
-        }),
+        tags: items.map((item) => ({
+          id: item.id,
+          x: item.x ?? 50,
+          y: item.y ?? 50,
+          name: item.title,
+          category: item.category,
+          included: true,
+        })),
       }));
+    } finally {
       setExtracting(false);
-    }, 1200);
+    }
   }
 
   function toggleTagIncluded(id: string) {
@@ -115,89 +235,67 @@ export function CollectionApp({
     setDraft((d) => ({ ...d, tags: d.tags.map((t) => (t.id === id ? { ...t, name } : t)) }));
   }
 
-  function submitCollection() {
-    if (draft.tags.length === 0) return;
-    const includedTags: ItemTag[] = draft.tags
-      .filter((t) => t.included)
-      .map((t) => ({
-        id: t.id,
-        x: t.x,
-        y: t.y,
-        name: t.name,
-        category: t.category,
-        status: "未出品",
-        wants: [],
-      }));
-    const newPost: CollectionPost = {
-      id: `c${Date.now()}`,
-      user: currentUser,
-      photo: draft.photo,
-      title: draft.title || "(無題)",
+  async function submitCollection() {
+    if (draft.tags.length === 0 || !draftCollectionId) return;
+    await collectionApiClient.updateCollection(draftCollectionId, {
+      title: draft.title || "無題のコレクション",
       body: draft.body,
-      postedAt: "たった今",
-      likes: 0,
-      liked: false,
-      comments: [],
-      tags: includedTags,
-    };
-    onCollectionsChange((prev) => [newPost, ...prev]);
-    setDraft(emptyDraft());
-    goToMyPage("collection");
+    });
+    setDraft(emptyDraftLocal());
+    setDraftCollectionId(null);
+    await goToMyPage("collection");
   }
 
-  /* ---- 詳細画面 ---- */
-  function toggleLike() {
-    if (!currentDetail) return;
-    const id = currentDetail.id;
-    onCollectionsChange((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, liked: !c.liked, likes: c.likes + (c.liked ? -1 : 1) } : c))
-    );
+  async function toggleLike() {
+    if (!currentDetailCollection) return;
+    const id = currentDetailCollection.id;
+    const alreadyLiked = likedIds.has(id);
+    if (alreadyLiked) return; // 二重いいねはUI側でも防ぐ（バックエンドも冪等）
+    const { likeCount } = await collectionApiClient.like(id, likerId);
+    setCollections((prev) => prev.map((c) => (c.id === id ? { ...c, likeCount } : c)));
+    const next = new Set(likedIds);
+    next.add(id);
+    setLikedIds(next);
+    writeLikedIds(next);
   }
 
-  function sendComment(text: string) {
-    if (!currentDetail) return;
-    const id = currentDetail.id;
-    onCollectionsChange((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, comments: [...c.comments, { user: "あなた", text }] } : c))
-    );
+  async function sendComment(text: string) {
+    if (!currentDetailCollection) return;
+    const comment = await collectionApiClient.addComment(currentDetailCollection.id, {
+      authorName: ownerName || "ゲスト",
+      text,
+    });
+    setDetailComments((prev) => [...prev, comment]);
   }
 
-  function openBuySheet(tagId: string) {
-    setBuyTagId(tagId);
+  function openBuySheet(itemId: string) {
+    setActiveBuyItemId(itemId);
     setBuyPrice(3000);
     setSheet("buy");
   }
 
-  function submitBuy() {
-    if (!currentDetail || !buyTagId) return;
-    const id = currentDetail.id;
-    const tagId = buyTagId;
-    const price = buyPrice;
-    onCollectionsChange((prev) =>
-      prev.map((c) =>
-        c.id === id
-          ? {
-              ...c,
-              tags: c.tags.map((t) =>
-                t.id === tagId
-                  ? { ...t, wants: [...t.wants, { from: demoBuyer.name, price, at: "たった今" }] }
-                  : t
-              ),
-            }
-          : c
-      )
+  async function submitBuy() {
+    if (!currentDetailCollection || !activeBuyItemId) return;
+    const item = detailItems.find((i) => i.id === activeBuyItemId);
+    if (!item) return;
+    const buyRequest = await collectionApiClient.createBuyRequest(
+      currentDetailCollection.id,
+      activeBuyItemId,
+      { fromName: "たなか（デモ購入者）", price: buyPrice }
     );
+    setDetailBuyRequests((prev) => [buyRequest, ...prev]);
     setSheet(null);
     showToast("伝えました");
     window.setTimeout(() => setRoleSwitchVisible(true), 500);
   }
 
-  /* ---- 投稿者側への切り替え／通知 ---- */
   function handleSwitchRole() {
-    if (!currentDetail) return;
-    const tag = [...currentDetail.tags].reverse().find((t) => t.wants.length > 0);
-    if (!tag) return;
-    setNotifTarget({ collectionId: currentDetail.id, tagId: tag.id });
+    const pending = detailBuyRequests[0];
+    if (!pending) return;
+    const item = detailItems.find((i) => i.id === pending.itemId);
+    if (!item) return;
+    setNotifItem(item);
+    setNotifBuyRequest(pending);
     setScreen("notification");
   }
 
@@ -206,25 +304,60 @@ export function CollectionApp({
     goToMyPage("collection");
   }
 
-  function completeSell(values: { name: string; description: string; price: number }) {
-    if (!notifTarget) return;
-    const { collectionId, tagId } = notifTarget;
-    onCollectionsChange((prev) =>
-      prev.map((c) =>
-        c.id === collectionId
-          ? { ...c, tags: c.tags.map((t) => (t.id === tagId ? { ...t, name: values.name, status: "出品中" } : t)) }
-          : c
-      )
-    );
+  async function completeSell(values: { name: string; description: string; price: number }) {
+    if (!currentDetailCollection || !notifItem) return;
+    await collectionApiClient.submitDecision(currentDetailCollection.id, notifItem.id, {
+      decision: "let_go",
+      itemName: values.name,
+      imageUrl: notifItem.imageUrl,
+    });
     setCompleteMessage(`「${values.name}」の出品が完了しました。買いたいと伝えてくれた人に届きます。`);
     setScreen("sell-complete");
+  }
+
+  if (!ownerNameLoaded) return null;
+
+  if (!ownerName) {
+    return (
+      <section className="screen active">
+        <div className="app-bar">
+          <button type="button" className="back-chevron" onClick={onExit}>
+            ←
+          </button>
+          <div className="app-bar-title">表示名を設定</div>
+        </div>
+        <div className="screen-scroll">
+          <p className="hero-sub">コレクション機能を使うには、表示名を1つ決めてください（ログイン不要）。</p>
+          <div className="draft-field">
+            <label>表示名</label>
+            <input
+              className="draft-input"
+              value={ownerNameDraft}
+              onChange={(e) => setOwnerNameDraft(e.target.value)}
+              placeholder="例：ゆうき"
+            />
+          </div>
+          <button
+            type="button"
+            className="cta"
+            disabled={!ownerNameDraft.trim()}
+            onClick={() => {
+              storeOwnerName(ownerNameDraft.trim());
+              setOwnerName(ownerNameDraft.trim());
+            }}
+          >
+            決定
+          </button>
+        </div>
+      </section>
+    );
   }
 
   let content: ReactNode = null;
   if (screen === "create") {
     content = (
       <CollectionCreateScreen
-        draft={draft}
+        draft={{ photo: draft.photoPreview, title: draft.title, body: draft.body, tags: draft.tags }}
         extracting={extracting}
         onBack={onExit}
         onOpenPhotoSheet={() => setSheet("photo")}
@@ -237,20 +370,40 @@ export function CollectionApp({
       />
     );
   } else if (screen === "mypage") {
+    const posts: CollectionPost[] = collections.map((c) => ({
+      id: c.id,
+      user: { name: c.ownerName, avatar: c.ownerName.charAt(0) || "?" },
+      photo: collectionPhotos[c.id] ?? null,
+      title: c.title,
+      body: c.body ?? "",
+      postedAt: new Date(c.createdAt).toLocaleString("ja-JP"),
+      likes: c.likeCount,
+      liked: likedIds.has(c.id),
+      comments: [],
+      tags: Array.from({ length: collectionTagCounts[c.id] ?? 0 }, (_, i) => ({
+        id: `${c.id}-${i}`,
+        x: 0,
+        y: 0,
+        name: "",
+        category: "",
+        status: "未出品" as const,
+        wants: [],
+      })),
+    }));
     content = (
       <CollectionMyPageScreen
-        user={currentUser}
+        user={{ name: ownerName, avatar: ownerName.charAt(0) || "?" }}
         tab={myPageTab}
-        collections={collections}
+        collections={posts}
         onBack={onExit}
         onChangeTab={setMyPageTab}
         onOpenDetail={openDetail}
       />
     );
-  } else if (screen === "detail" && currentDetail) {
+  } else if (screen === "detail" && currentDetailPost) {
     content = (
       <CollectionDetailScreen
-        post={currentDetail}
+        post={currentDetailPost}
         onBack={() => goToMyPage("collection")}
         onToggleLike={toggleLike}
         onSendComment={sendComment}
@@ -259,26 +412,26 @@ export function CollectionApp({
         onSwitchRole={handleSwitchRole}
       />
     );
-  } else if (screen === "notification" && notifCollection && notifTag && notifWant) {
+  } else if (screen === "notification" && notifItem && notifBuyRequest) {
     content = (
       <CollectionNotificationScreen
-        tagName={notifTag.name}
-        buyerName={demoBuyer.name}
-        buyerAvatar={demoBuyer.avatar}
-        price={notifWant.price}
+        tagName={notifItem.title}
+        buyerName={notifBuyRequest.fromName}
+        buyerAvatar={notifBuyRequest.fromName.charAt(0)}
+        price={notifBuyRequest.price}
         onBack={() => goToMyPage("collection")}
         onDecline={declineList}
         onStartSell={() => setScreen("sell")}
       />
     );
-  } else if (screen === "sell" && notifCollection && notifTag && notifWant) {
+  } else if (screen === "sell" && notifItem && notifBuyRequest) {
     content = (
       <CollectionSellScreen
-        photo={notifCollection.photo}
-        initialName={notifTag.name}
-        initialDescription={notifCollection.body}
-        category={notifTag.category}
-        initialPrice={notifWant.price}
+        photo={notifItem.imageUrl}
+        initialName={notifItem.title}
+        initialDescription={currentDetailCollection?.body ?? ""}
+        category={notifItem.category}
+        initialPrice={notifBuyRequest.price}
         onBack={() => setScreen("notification")}
         onComplete={completeSell}
       />
@@ -293,18 +446,25 @@ export function CollectionApp({
     <>
       {content}
 
-      <div
-        className={`sheet-backdrop${sheet ? " open" : ""}`}
-        onClick={() => setSheet(null)}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) setDraftPhotoFile(file);
+          e.target.value = "";
+        }}
       />
+
+      <div className={`sheet-backdrop${sheet ? " open" : ""}`} onClick={() => setSheet(null)} />
       <div className={`sheet${sheet === "photo" ? " open" : ""}`}>
         <div className="sheet-handle" />
         <div className="sheet-title">写真を追加</div>
-        <button type="button" className="sheet-option" onClick={() => setDraftPhoto("photos/room-01.jpg")}>
-          📷 カメラで撮影
-        </button>
-        <button type="button" className="sheet-option" onClick={() => setDraftPhoto("photos/room-01.jpg")}>
-          🖼 アルバムから選ぶ
+        <button type="button" className="sheet-option" onClick={() => fileInputRef.current?.click()}>
+          📷 カメラで撮影 / アルバムから選ぶ
         </button>
         <button type="button" className="sheet-cancel" onClick={() => setSheet(null)}>
           キャンセル
@@ -314,7 +474,7 @@ export function CollectionApp({
         <div className="sheet-handle" />
         <div className="sheet-title">この商品を買いたいと伝えます</div>
         <p className="hero-sub" style={{ marginBottom: 12 }}>
-          対象：<b>{buyTargetTag?.name}</b>
+          対象：<b>{buyTargetItem?.title}</b>
         </p>
         <div className="draft-field">
           <label>希望金額</label>
@@ -337,7 +497,7 @@ export function CollectionApp({
           />
         </div>
         <p className="collection-sheet-note">
-          {currentDetail?.user.name}さんに通知されます。出品するかどうかは相手が決めます。
+          {currentDetailCollection?.ownerName}さんに通知されます。出品するかどうかは相手が決めます。
         </p>
         <button type="button" className="cta" onClick={submitBuy}>
           送る
