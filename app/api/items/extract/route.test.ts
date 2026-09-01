@@ -50,19 +50,20 @@ describe("POST /api/items/extract", () => {
     expect(body.items[0].title).toBe("フィギュア");
   });
 
-  it("falls back when Gemini fails", async () => {
+  it("returns the Gemini error instead of fallback items", async () => {
     generateContentMock.mockResolvedValue({ text: "{}" });
     const collection = await createCollection({ ownerName: "A", title: "コレクション" });
     const { POST } = await import("./route");
     const res = await POST(request({ collectionId: collection.id, imageBase64: "abc", mimeType: "image/png" }));
-    expect((await res.json()).items.length).toBeGreaterThanOrEqual(3);
+    expect(res.status).toBe(502);
+    expect((await res.json()).error).toBe("Gemini extraction failed");
   });
 
-  it("falls back to a single item in single mode when Gemini fails", async () => {
+  it("returns the Gemini error in single mode too", async () => {
     generateContentMock.mockResolvedValue({ text: "{}" });
     const collection = await createCollection({ ownerName: "A", title: "コレクション" });
     const { POST } = await import("./route");
     const res = await POST(request({ collectionId: collection.id, imageBase64: "abc", mimeType: "image/png", mode: "single" }));
-    expect((await res.json()).items).toHaveLength(1);
+    expect(res.status).toBe(502);
   });
 });

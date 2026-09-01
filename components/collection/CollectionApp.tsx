@@ -8,7 +8,13 @@ import {
   resizeImageToBase64,
   storeOwnerName,
 } from "@/lib/collection-api-client";
-import type { BuyRequest, Collection, Comment as BackendComment, Item } from "@/lib/types";
+import type {
+  BuyRequest,
+  Collection,
+  Comment as BackendComment,
+  Item,
+  ReleaseCandidate,
+} from "@/lib/types";
 import type { CollectionPost, DraftTag, ItemTag, MyPageTab } from "@/lib/collection-types";
 import { CollectionCreateScreen } from "./CollectionCreateScreen";
 import { CollectionMyPageScreen } from "./CollectionMyPageScreen";
@@ -127,6 +133,7 @@ export function CollectionApp({
 
   const [notifItem, setNotifItem] = useState<Item | null>(null);
   const [notifBuyRequest, setNotifBuyRequest] = useState<BuyRequest | null>(null);
+  const [notifReleaseCandidate, setNotifReleaseCandidate] = useState<ReleaseCandidate | null>(null);
   const [roleSwitchVisible, setRoleSwitchVisible] = useState(false);
   const [completeMessage, setCompleteMessage] = useState("");
 
@@ -182,11 +189,20 @@ export function CollectionApp({
   async function openDetail(id: string) {
     setCurrentDetailId(id);
     setRoleSwitchVisible(false);
+    setNotifReleaseCandidate(null);
     const detail = await collectionApiClient.getCollection(id);
     setDetailItems(detail.items);
     setDetailComments(detail.comments);
     setDetailBuyRequests(await collectionApiClient.listPendingBuyRequests(id));
     setScreen("detail");
+
+    // マイページの投稿は常に自分のコレクションなので、開いたタイミングでAIに
+    // 手放し提案があるか確認し、あれば投稿者側バナー経由で知らせる。
+    const { candidates } = await collectionApiClient.suggestRelease(id);
+    if (candidates.length > 0) {
+      setNotifReleaseCandidate(candidates[0]);
+      setRoleSwitchVisible(true);
+    }
   }
 
   function goToMyPage(tab: MyPageTab = "collection") {
@@ -223,6 +239,9 @@ export function CollectionApp({
           included: true,
         })),
       }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      showToast(`商品抽出に失敗しました: ${message}`);
     } finally {
       setExtracting(false);
     }
@@ -241,6 +260,13 @@ export function CollectionApp({
 
   async function submitCollection() {
     if (draft.tags.length === 0 || !draftCollectionId) return;
+    await Promise.all(
+      draft.tags.map((tag) =>
+        tag.included
+          ? collectionApiClient.updateItemTitle(draftCollectionId, tag.id, tag.name)
+          : collectionApiClient.deleteItem(draftCollectionId, tag.id)
+      )
+    );
     await collectionApiClient.updateCollection(draftCollectionId, {
       title: draft.title || "無題のコレクション",
       body: draft.body,
@@ -295,15 +321,33 @@ export function CollectionApp({
 
   function handleSwitchRole() {
     const pending = detailBuyRequests[0];
-    if (!pending) return;
-    const item = detailItems.find((i) => i.id === pending.itemId);
-    if (!item) return;
-    setNotifItem(item);
-    setNotifBuyRequest(pending);
-    setScreen("notification");
+    if (pending) {
+      const item = detailItems.find((i) => i.id === pending.itemId);
+      if (!item) return;
+      setNotifItem(item);
+      setNotifBuyRequest(pending);
+      setNotifReleaseCandidate(null);
+      setScreen("notification");
+      return;
+    }
+    if (notifReleaseCandidate) {
+      const item = detailItems.find((i) => i.id === notifReleaseCandidate.itemId);
+      if (!item) return;
+      setNotifItem(item);
+      setNotifBuyRequest(null);
+      setScreen("notification");
+    }
   }
 
-  function declineList() {
+  async function declineList() {
+    if (currentDetailCollection && notifBuyRequest) {
+      await collectionApiClient.updateBuyRequestStatus(
+        currentDetailCollection.id,
+        notifBuyRequest.itemId,
+        notifBuyRequest.id,
+        "declined"
+      );
+    }
     showToast("また今度、出品するか検討できます");
     goToMyPage("collection");
   }
@@ -315,7 +359,19 @@ export function CollectionApp({
       itemName: values.name,
       imageUrl: notifItem.imageUrl,
     });
-    setCompleteMessage(`「${values.name}」の出品が完了しました。買いたいと伝えてくれた人に届きます。`);
+    if (notifBuyRequest) {
+      await collectionApiClient.updateBuyRequestStatus(
+        currentDetailCollection.id,
+        notifBuyRequest.itemId,
+        notifBuyRequest.id,
+        "listed"
+      );
+    }
+    setCompleteMessage(
+      notifBuyRequest
+        ? `「${values.name}」の出品が完了しました。買いたいと伝えてくれた人に届きます。`
+        : `「${values.name}」の出品が完了しました。`
+    );
     setScreen("sell-complete");
   }
 
@@ -380,26 +436,32 @@ export function CollectionApp({
         onSwitchRole={handleSwitchRole}
       />
     );
-  } else if (screen === "notification" && notifItem && notifBuyRequest) {
+  } else if (screen === "notification" && notifItem) {
     content = (
       <CollectionNotificationScreen
         tagName={notifItem.title}
-        buyerName={notifBuyRequest.fromName}
-        buyerAvatar={notifBuyRequest.fromName.charAt(0)}
-        price={notifBuyRequest.price}
+        buyerName={notifBuyRequest?.fromName}
+        buyerAvatar={notifBuyRequest?.fromName.charAt(0)}
+        price={notifBuyRequest?.price}
+        reason={notifReleaseCandidate?.reason}
         onBack={() => goToMyPage("collection")}
         onDecline={declineList}
         onStartSell={() => setScreen("sell")}
       />
     );
-  } else if (screen === "sell" && notifItem && notifBuyRequest) {
+  } else if (screen === "sell" && notifItem) {
     content = (
       <CollectionSellScreen
         photo={notifItem.imageUrl}
         initialName={notifItem.title}
         initialDescription={currentDetailCollection?.body ?? ""}
         category={notifItem.category}
-        initialPrice={notifBuyRequest.price}
+        initialPrice={notifBuyRequest?.price ?? notifItem.estimatedPrice ?? 0}
+        progressMessage={
+          notifBuyRequest
+            ? undefined
+            : `AIからの提案：${notifReleaseCandidate?.reason ?? ""}`
+        }
         onBack={() => setScreen("notification")}
         onComplete={completeSell}
       />

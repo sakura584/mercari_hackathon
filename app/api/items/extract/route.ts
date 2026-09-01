@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { GEMINI_MODEL, getGeminiClient } from "@/lib/gemini";
 import { EXTRACT_ITEMS_SCHEMA } from "@/lib/extraction-tools";
-import { FALLBACK_EXTRACTED_ITEMS } from "@/lib/extraction-fallback";
 import { uploadRoomImage } from "@/lib/storage";
 import { createItem } from "@/lib/repositories/item-repository";
 import type { Item } from "@/lib/types";
@@ -14,6 +13,10 @@ type ExtractedCandidate = {
   y?: number;
 };
 type ExtractMode = "single" | "collection";
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 async function extractCandidates(
   imageBase64: string,
@@ -52,28 +55,45 @@ export async function POST(request: Request): Promise<Response> {
   }
   const mode: ExtractMode = body.mode === "single" ? "single" : "collection";
 
-  const imageUrl = await uploadRoomImage(body.collectionId, body.imageBase64, body.mimeType);
+  let imageUrl: string;
+  try {
+    imageUrl = await uploadRoomImage(body.collectionId, body.imageBase64, body.mimeType);
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Firebase Storage upload failed", details: errorMessage(error) },
+      { status: 502 }
+    );
+  }
 
   let candidates: ExtractedCandidate[];
   try {
     candidates = await extractCandidates(body.imageBase64, body.mimeType, mode);
-  } catch {
-    candidates = mode === "single" ? [FALLBACK_EXTRACTED_ITEMS[0]] : FALLBACK_EXTRACTED_ITEMS;
-  }
-
-  const items: Item[] = [];
-  for (const candidate of candidates) {
-    items.push(
-      await createItem({
-        collectionId: body.collectionId,
-        imageUrl,
-        title: candidate.title,
-        category: candidate.category,
-        x: candidate.x,
-        y: candidate.y,
-      })
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Gemini extraction failed", details: errorMessage(error) },
+      { status: 502 }
     );
   }
 
-  return NextResponse.json({ items }, { status: 201 });
+  try {
+    const items: Item[] = [];
+    for (const candidate of candidates) {
+      items.push(
+        await createItem({
+          collectionId: body.collectionId,
+          imageUrl,
+          title: candidate.title,
+          category: candidate.category,
+          x: candidate.x,
+          y: candidate.y,
+        })
+      );
+    }
+    return NextResponse.json({ items }, { status: 201 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Firestore item save failed", details: errorMessage(error) },
+      { status: 502 }
+    );
+  }
 }

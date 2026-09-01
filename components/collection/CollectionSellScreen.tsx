@@ -9,6 +9,7 @@ export function CollectionSellScreen({
   initialDescription,
   category,
   initialPrice,
+  progressMessage = "買いたい人がすでにいます。内容を確認して出品してください。",
   onBack,
   onComplete,
 }: {
@@ -17,6 +18,7 @@ export function CollectionSellScreen({
   initialDescription: string;
   category: string;
   initialPrice: number;
+  progressMessage?: string;
   onBack: () => void;
   onComplete: (values: { name: string; description: string; price: number }) => void;
 }) {
@@ -33,9 +35,7 @@ export function CollectionSellScreen({
         <div className="app-bar-title">商品の情報を入力</div>
       </div>
       <div className="screen-scroll">
-        <div className="progress-banner">
-          買いたい人がすでにいます。内容を確認して出品してください。
-        </div>
+        <div className="progress-banner">{progressMessage}</div>
 
         {photo ? (
           <img

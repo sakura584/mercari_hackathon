@@ -6,7 +6,11 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`POST ${url} failed: ${res.status}`);
+  if (!res.ok) {
+    const payload = await res.json().catch(() => null) as { error?: string; details?: string } | null;
+    const reason = payload?.details ?? payload?.error ?? `HTTP ${res.status}`;
+    throw new Error(`POST ${url} failed: ${reason}`);
+  }
   return res.json();
 }
 
@@ -14,6 +18,20 @@ async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
   return res.json();
+}
+
+async function patchJson(url: string, body: unknown): Promise<void> {
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`PATCH ${url} failed: ${res.status}`);
+}
+
+async function deleteRequest(url: string): Promise<void> {
+  const res = await fetch(url, { method: "DELETE" });
+  if (!res.ok) throw new Error(`DELETE ${url} failed: ${res.status}`);
 }
 
 export const collectionApiClient = {
@@ -91,6 +109,26 @@ export const collectionApiClient = {
     return postJson<{ candidates: ReleaseCandidate[] }>(
       `/api/collections/${collectionId}/suggest-release`,
       {}
+    );
+  },
+
+  updateItemTitle(collectionId: string, itemId: string, title: string): Promise<void> {
+    return patchJson(`/api/collections/${collectionId}/items/${itemId}`, { title });
+  },
+
+  deleteItem(collectionId: string, itemId: string): Promise<void> {
+    return deleteRequest(`/api/collections/${collectionId}/items/${itemId}`);
+  },
+
+  updateBuyRequestStatus(
+    collectionId: string,
+    itemId: string,
+    buyRequestId: string,
+    status: "declined" | "listed"
+  ): Promise<void> {
+    return patchJson(
+      `/api/collections/${collectionId}/items/${itemId}/buy-requests/${buyRequestId}`,
+      { status }
     );
   },
 };

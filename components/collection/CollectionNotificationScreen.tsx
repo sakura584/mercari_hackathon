@@ -3,18 +3,21 @@ export function CollectionNotificationScreen({
   buyerName,
   buyerAvatar,
   price,
+  reason,
   onBack,
   onDecline,
   onStartSell,
 }: {
   tagName: string;
-  buyerName: string;
-  buyerAvatar: string;
-  price: number;
+  buyerName?: string;
+  buyerAvatar?: string;
+  price?: number;
+  reason?: string;
   onBack: () => void;
   onDecline: () => void;
   onStartSell: () => void;
 }) {
+  const isAiSuggestion = !buyerName;
   return (
     <section className="screen active">
       <div className="app-bar">
@@ -27,16 +30,27 @@ export function CollectionNotificationScreen({
         <div className="card">
           <p className="hero-sub" style={{ marginBottom: 14 }}>
             あなたのコレクションの『<b style={{ color: "var(--brand)" }}>{tagName}</b>
-            』に、買いたいという人がいます
+            』{isAiSuggestion ? "について、AIから手放しの提案があります" : "に、買いたいという人がいます"}
           </p>
           <div className="collection-detail-user-row" style={{ padding: 0, marginBottom: 16 }}>
-            <div className="mypage-avatar" style={{ width: 34, height: 34, fontSize: 13 }}>
-              {buyerAvatar}
-            </div>
-            <div>
-              <div className="collection-detail-user-name">{buyerName}さん</div>
-              <div className="collection-notif-price">希望金額 ¥{price.toLocaleString("ja-JP")}</div>
-            </div>
+            {isAiSuggestion ? (
+              <div>
+                <div className="collection-detail-user-name">AIからの提案</div>
+                <div className="collection-notif-price">{reason}</div>
+              </div>
+            ) : (
+              <>
+                <div className="mypage-avatar" style={{ width: 34, height: 34, fontSize: 13 }}>
+                  {buyerAvatar}
+                </div>
+                <div>
+                  <div className="collection-detail-user-name">{buyerName}さん</div>
+                  <div className="collection-notif-price">
+                    希望金額 ¥{(price ?? 0).toLocaleString("ja-JP")}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
           <div className="decision-row">
             <button type="button" className="cta ghost" onClick={onDecline}>
