@@ -1,0 +1,1183 @@
+<title>コレクション プロトタイプ</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Noto+Serif+JP:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --red:#e5342c;
+  --border:#e6e6e6;
+  --text:#222;
+  --sub:#888;
+  --bg:#fff;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:#ccc;
+  font-family:'Noto Sans JP',sans-serif;
+  color:var(--text);
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+img{-webkit-user-drag:none;user-select:none;}
+button{font-family:inherit;}
+input,textarea{font-family:inherit;}
+
+.phone{
+  position:relative;
+  width:390px;
+  height:844px;
+  background:#fff;
+  border-radius:44px;
+  border:8px solid #111;
+  overflow:clip;
+  box-shadow:0 20px 60px rgba(0,0,0,.35);
+}
+.notch{
+  position:absolute;
+  top:0;left:50%;
+  transform:translateX(-50%);
+  width:140px;height:26px;
+  background:#111;
+  border-radius:0 0 16px 16px;
+  z-index:200;
+}
+
+.screen{
+  position:absolute;
+  inset:0;
+  display:none;
+  flex-direction:column;
+  background:#fff;
+}
+.screen.active{display:flex;}
+.screen-body{
+  flex:1;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+}
+.screen-body::-webkit-scrollbar{display:none;}
+
+/* ---------- sub header (back button screens) ---------- */
+.sub-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:16px 8px 12px;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.back-btn{
+  width:34px;height:34px;
+  border:none;background:none;
+  font-size:20px;color:#333;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+}
+.sub-title{font-weight:700;font-size:15px;}
+.sub-header-spacer{width:34px;}
+
+/* ---------- home header ---------- */
+.app-header{
+  padding:14px 16px 8px;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.logo-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.logo{color:var(--red);font-weight:900;font-size:21px;letter-spacing:-.5px;}
+.search-box{
+  flex:1;
+  background:#f4f4f4;
+  border-radius:7px;
+  padding:9px 12px;
+  color:#a3a3a3;
+  font-size:13px;
+}
+.category-tabs{
+  display:flex;gap:18px;
+  overflow-x:auto;
+  font-size:13px;color:#666;
+  white-space:nowrap;
+}
+.category-tabs::-webkit-scrollbar{display:none;}
+.category-tabs span{padding-bottom:8px;flex-shrink:0;}
+.category-tabs span.active{color:var(--red);font-weight:700;border-bottom:2px solid var(--red);}
+
+/* ---------- product grid (decorative) ---------- */
+.product-grid{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:1px;background:var(--border);
+}
+.product-card{background:#fff;padding:9px;}
+.product-photo{
+  width:100%;aspect-ratio:1;object-fit:cover;
+  background:#eee;border-radius:4px;margin-bottom:6px;display:block;
+}
+.product-price{font-weight:700;font-size:14px;}
+.product-price small{font-weight:500;font-size:11px;}
+.product-title{
+  font-size:11.5px;color:#666;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  margin-top:2px;
+}
+
+/* ---------- tab bar ---------- */
+.tabbar{
+  display:flex;align-items:center;
+  border-top:1px solid var(--border);
+  background:#fff;height:70px;flex-shrink:0;
+  padding-bottom:6px;
+}
+.tab-item{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:3px;font-size:10px;color:#a0a0a0;
+  cursor:pointer;background:none;border:none;
+}
+.tab-item.active{color:var(--red);}
+.tab-icon{font-size:19px;line-height:1;}
+.tab-sell{
+  flex:1;display:flex;align-items:center;justify-content:center;
+}
+.tab-sell-btn{
+  width:44px;height:44px;border-radius:50%;
+  background:var(--red);color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  font-size:24px;margin-top:-10px;
+  box-shadow:0 3px 10px rgba(229,52,44,.45);
+  border:none;cursor:pointer;
+}
+.collection-icon{position:relative;width:20px;height:16px;flex-shrink:0;}
+.collection-icon .sq{position:absolute;border:1.6px solid currentColor;border-radius:3px;}
+.collection-icon .sq1{width:12px;height:12px;left:0;top:0;background:#fff;}
+.collection-icon .sq2{width:12px;height:12px;left:7px;top:3px;background:#fff;}
+
+/* ---------- bottom sheet ---------- */
+.sheet-backdrop{
+  position:absolute;inset:0;background:rgba(0,0,0,.4);
+  opacity:0;pointer-events:none;transition:opacity .25s;
+  z-index:60;
+}
+.sheet-backdrop.active{opacity:1;pointer-events:auto;}
+.bottom-sheet{
+  position:absolute;left:0;right:0;bottom:0;
+  background:#fff;border-radius:18px 18px 0 0;
+  padding:22px 20px calc(22px + env(safe-area-inset-bottom,0px));
+  transform:translateY(100%);
+  transition:transform .32s cubic-bezier(.2,.9,.3,1);
+  z-index:61;
+  box-shadow:0 -6px 24px rgba(0,0,0,.18);
+}
+.bottom-sheet.active{transform:translateY(0);}
+.sheet-handle{
+  width:36px;height:4px;background:#ddd;border-radius:2px;
+  margin:0 auto 18px;
+}
+.sheet-title{font-weight:700;font-size:16px;margin-bottom:16px;}
+.sheet-option-btn{
+  width:100%;text-align:left;padding:15px 14px;
+  border:1px solid var(--border);border-radius:10px;
+  background:#fff;font-size:14px;font-weight:500;
+  margin-bottom:10px;cursor:pointer;color:var(--text);
+}
+.sheet-option-btn:active{background:#f7f7f7;}
+.sheet-note{font-size:11.5px;color:var(--sub);line-height:1.6;margin:14px 0 18px;}
+.sheet-cancel{
+  width:100%;padding:13px;border:none;background:none;
+  color:var(--sub);font-size:13px;cursor:pointer;
+}
+
+/* ---------- loading overlay ---------- */
+.loading-overlay{
+  position:absolute;inset:0;background:rgba(255,255,255,.95);
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  gap:18px;z-index:90;
+}
+.loading-overlay.active{display:flex;}
+.spinner{
+  width:34px;height:34px;border-radius:50%;
+  border:3px solid #eee;border-top-color:var(--red);
+  animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{font-size:13.5px;color:#555;font-weight:500;}
+
+/* ---------- toast ---------- */
+.toast{
+  position:absolute;left:50%;bottom:110px;
+  transform:translateX(-50%) translateY(14px);
+  background:rgba(20,20,20,.85);color:#fff;
+  padding:10px 20px;border-radius:20px;font-size:13px;
+  opacity:0;transition:all .25s;z-index:120;
+  pointer-events:none;white-space:nowrap;
+}
+.toast.active{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* ---------- role switch banner ---------- */
+.role-switch-banner{
+  position:absolute;left:12px;right:12px;bottom:16px;
+  background:#222;color:#fff;border-radius:12px;
+  padding:12px 14px;display:none;
+  align-items:center;justify-content:space-between;gap:10px;
+  z-index:70;box-shadow:0 6px 20px rgba(0,0,0,.3);
+}
+.role-switch-banner.active{display:flex;}
+.role-switch-banner span{font-size:11px;color:#ccc;flex-shrink:0;}
+.role-switch-banner button{
+  background:var(--red);color:#fff;border:none;border-radius:8px;
+  padding:9px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;
+}
+
+/* ---------- collection create screen (A) ---------- */
+.create-photo-area{
+  margin:16px;
+  aspect-ratio:1/1;
+  border-radius:10px;
+  position:relative;
+  overflow:hidden;
+}
+.create-photo-empty{
+  width:100%;height:100%;
+  border:1.5px dashed #ccc;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  background:#fafafa;
+}
+.add-photo-btn{
+  background:#fff;border:1px solid #ddd;border-radius:8px;
+  padding:12px 20px;font-size:13.5px;font-weight:700;color:#555;
+  cursor:pointer;display:flex;align-items:center;gap:6px;
+}
+.create-photo-area img{
+  width:100%;height:100%;object-fit:cover;display:block;
+}
+.extract-btn-wrap{padding:0 16px 6px;}
+.extract-btn{
+  width:100%;padding:12px;border-radius:8px;border:1.5px solid var(--red);
+  background:#fff;color:var(--red);font-weight:700;font-size:14px;cursor:pointer;
+}
+.form-section{padding:14px 16px;border-top:1px solid var(--border);}
+.form-label{font-size:12px;color:var(--sub);margin-bottom:6px;font-weight:500;}
+.form-input{
+  width:100%;border:1px solid var(--border);border-radius:8px;
+  padding:10px 12px;font-size:14px;margin-bottom:14px;
+}
+.form-textarea{
+  width:100%;border:1px solid var(--border);border-radius:8px;
+  padding:10px 12px;font-size:14px;min-height:70px;resize:none;
+}
+.tag-list-section{padding:6px 16px 4px;}
+.tag-list-title{font-size:12px;color:var(--sub);font-weight:500;margin:10px 0 2px;}
+.tag-row{
+  display:flex;align-items:center;gap:10px;
+  padding:11px 0;border-bottom:1px solid var(--border);
+}
+.tag-row-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}
+.tag-name-input{
+  border:none;border-bottom:1px solid transparent;
+  font-size:14px;font-weight:700;padding:2px 0;width:100%;
+  background:transparent;
+}
+.tag-name-input:focus{border-bottom-color:var(--red);outline:none;}
+.tag-category{font-size:11px;color:#999;}
+.tag-row.excluded .tag-row-info{opacity:.35;}
+.switch{
+  width:38px;height:22px;border-radius:11px;background:#ddd;
+  position:relative;cursor:pointer;flex-shrink:0;transition:background .15s;
+}
+.switch.on{background:var(--red);}
+.switch .knob{
+  position:absolute;top:2px;left:2px;width:18px;height:18px;
+  border-radius:50%;background:#fff;transition:left .15s;
+  box-shadow:0 1px 3px rgba(0,0,0,.25);
+}
+.switch.on .knob{left:18px;}
+.post-btn-wrap{padding:16px;}
+.post-btn{
+  width:100%;padding:14px;border-radius:8px;border:none;
+  background:var(--red);color:#fff;font-weight:700;font-size:15px;cursor:pointer;
+}
+.post-btn:disabled{background:#e5c3c1;cursor:not-allowed;}
+
+/* pins */
+.pin{
+  position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;
+  border-radius:50%;background:rgba(229,52,44,.88);
+  border:2px solid #fff;box-shadow:0 0 0 2px rgba(229,52,44,.35);
+  cursor:pointer;z-index:10;
+}
+.tag-popup{
+  position:absolute;background:#fff;border-radius:10px;
+  padding:11px 13px;box-shadow:0 6px 20px rgba(0,0,0,.22);
+  font-size:12px;min-width:160px;max-width:220px;z-index:40;
+  display:none;transform:translate(-50%,calc(-100% - 14px));
+}
+.tag-popup.active{display:block;}
+.tag-popup .tp-name{font-weight:700;font-size:13.5px;margin-bottom:4px;}
+.tag-popup .tp-cat{color:#999;font-size:11px;margin-bottom:8px;}
+.tag-popup .tp-status{
+  display:inline-block;background:#f2f2f2;color:#777;
+  font-size:10px;padding:3px 9px;border-radius:10px;margin-bottom:9px;
+}
+.tag-popup .tp-buy-btn{
+  width:100%;background:var(--red);color:#fff;border:none;
+  border-radius:6px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;
+}
+
+/* ---------- mypage ---------- */
+.profile-header{padding:20px 16px 4px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.profile-top{display:flex;align-items:center;gap:14px;margin-bottom:14px;}
+.avatar{
+  width:56px;height:56px;border-radius:50%;background:#f0d9c8;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:20px;color:#a56a3a;flex-shrink:0;
+}
+.avatar.small{width:34px;height:34px;font-size:13px;}
+.profile-name{font-weight:700;font-size:16px;margin-bottom:3px;}
+.profile-rating{font-size:12px;color:var(--sub);}
+.profile-tabs{display:flex;}
+.profile-tab{
+  flex:1;text-align:center;padding:11px 0;font-size:13px;color:var(--sub);
+  cursor:pointer;border-bottom:2px solid transparent;font-weight:500;
+}
+.profile-tab.active{color:var(--text);border-bottom-color:var(--red);font-weight:700;}
+
+.collection-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:16px;
+}
+.collection-cell{cursor:pointer;}
+.collection-cell-photo-wrap{position:relative;border-radius:8px;overflow:hidden;aspect-ratio:1/1;}
+.collection-cell-photo{width:100%;height:100%;object-fit:cover;display:block;}
+.tag-count-badge{
+  position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;
+  font-size:10.5px;padding:3px 7px;border-radius:10px;
+}
+.collection-cell-meta{display:flex;align-items:center;gap:4px;margin-top:8px;font-size:12px;color:var(--sub);}
+.empty-state{padding:60px 20px;text-align:center;color:var(--sub);font-size:13px;}
+
+/* ---------- detail screen ---------- */
+.detail-user-row{display:flex;align-items:center;gap:10px;padding:14px 16px;}
+.detail-user-name{font-weight:700;font-size:13.5px;}
+.detail-posted-at{font-size:11px;color:var(--sub);}
+.detail-photo-wrap{position:relative;width:100%;aspect-ratio:1/1;background:#eee;}
+.detail-photo-wrap img{width:100%;height:100%;object-fit:cover;display:block;}
+.detail-body-section{padding:14px 16px 6px;}
+.detail-title{
+  font-family:'Noto Serif JP',serif;font-weight:700;font-size:17px;
+  margin-bottom:8px;line-height:1.5;
+}
+.detail-text{font-size:13.5px;line-height:1.7;color:#444;}
+.tag-chips{display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px 4px;}
+.tag-chip{
+  background:#f5f5f5;color:#555;font-size:11.5px;
+  padding:6px 12px;border-radius:14px;
+}
+.action-bar{
+  display:flex;align-items:center;gap:22px;padding:14px 16px;
+  border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-top:8px;
+}
+.action-item{display:flex;align-items:center;gap:6px;font-size:13px;color:#555;background:none;border:none;cursor:pointer;padding:0;}
+.action-item .icon{font-size:18px;}
+.action-item.liked{color:var(--red);}
+.comments-section{padding:14px 16px 20px;}
+.comment-row{display:flex;gap:8px;margin-bottom:12px;font-size:13px;line-height:1.6;}
+.comment-user{font-weight:700;margin-right:6px;}
+.comment-input-row{display:flex;gap:8px;margin-top:10px;align-items:center;}
+.comment-input{
+  flex:1;border:1px solid var(--border);border-radius:18px;
+  padding:9px 14px;font-size:13px;
+}
+.comment-send-btn{
+  border:none;background:var(--red);color:#fff;border-radius:16px;
+  padding:9px 16px;font-size:12.5px;font-weight:700;cursor:pointer;
+}
+
+/* ---------- notification screen ---------- */
+.notif-card{
+  margin:16px;padding:16px;border:1px solid var(--border);border-radius:12px;
+}
+.notif-lead{font-size:14px;line-height:1.7;margin-bottom:14px;}
+.notif-lead b{color:var(--red);}
+.notif-buyer-row{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
+.notif-buyer-name{font-weight:700;font-size:13.5px;}
+.notif-price{font-size:19px;font-weight:900;color:var(--red);}
+.notif-btn-row{display:flex;gap:10px;}
+.notif-btn{
+  flex:1;padding:13px;border-radius:8px;font-size:13.5px;font-weight:700;cursor:pointer;
+}
+.notif-btn.primary{background:var(--red);color:#fff;border:none;}
+.notif-btn.secondary{background:#fff;color:#666;border:1px solid var(--border);}
+
+/* ---------- sell screen ---------- */
+.sell-highlight{
+  margin:14px 16px;padding:12px 14px;background:#fff4f3;border:1px solid #f3c9c6;
+  border-radius:10px;font-size:12px;color:#a13a32;line-height:1.6;
+}
+.sell-photo-row{padding:4px 16px 8px;}
+.sell-photo{width:88px;height:88px;border-radius:8px;object-fit:cover;display:block;}
+.sell-field{padding:12px 16px;border-top:1px solid var(--border);}
+.sell-field-label{font-size:12px;color:var(--sub);margin-bottom:6px;}
+.sell-field-value{
+  border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;width:100%;
+}
+.sell-static-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:14px 16px;border-top:1px solid var(--border);font-size:13.5px;
+}
+.sell-static-row span:last-child{color:var(--sub);}
+.sell-submit-wrap{padding:18px 16px;}
+
+/* ---------- sell complete ---------- */
+.complete-wrap{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+}
+.complete-check{
+  width:64px;height:64px;border-radius:50%;background:var(--red);
+  color:#fff;font-size:32px;display:flex;align-items:center;justify-content:center;
+}
+.complete-msg{font-size:16px;font-weight:700;}
+.complete-sub{font-size:12.5px;color:var(--sub);text-align:center;padding:0 30px;line-height:1.7;}
+.complete-btn{
+  padding:12px 28px;border-radius:8px;background:var(--red);color:#fff;
+  border:none;font-weight:700;font-size:14px;cursor:pointer;
+}
+
+/* buy sheet */
+.price-input-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.price-input-row input[type=number]{
+  width:110px;border:1px solid var(--border);border-radius:8px;
+  padding:9px 10px;font-size:16px;font-weight:700;text-align:right;
+}
+.price-input-row span{font-size:14px;color:var(--sub);}
+.price-slider{width:100%;margin-bottom:16px;accent-color:var(--red);}
+.sheet-send-btn{
+  width:100%;padding:13px;border-radius:8px;border:none;
+  background:var(--red);color:#fff;font-weight:700;font-size:14px;cursor:pointer;
+}
+.buy-target-name{font-weight:700;}
+</style>
+
+<div class="phone" id="phone">
+  <div class="notch"></div>
+
+  <!-- ========== 1. HOME ========== -->
+  <div class="screen active" data-screen="home">
+    <div class="app-header">
+      <div class="logo-row">
+        <div class="logo">mercari</div>
+        <div class="search-box">なにをお探しですか？</div>
+      </div>
+      <div class="category-tabs">
+        <span class="active">おすすめ</span>
+        <span>レディース</span>
+        <span>メンズ</span>
+        <span>ベビー・キッズ</span>
+        <span>インテリア</span>
+        <span>本・音楽・ゲーム</span>
+      </div>
+    </div>
+    <div class="screen-body">
+      <div class="product-grid" id="homeGrid"></div>
+    </div>
+    <div class="tabbar">
+      <button class="tab-item active"><span class="tab-icon">⌂</span>ホーム</button>
+      <button class="tab-item"><span class="tab-icon">⌕</span>さがす</button>
+      <button class="tab-item" onclick="openCreateScreen()">
+        <span class="collection-icon"><span class="sq sq1"></span><span class="sq sq2"></span></span>
+        コレクション
+      </button>
+      <div class="tab-sell"><button class="tab-sell-btn">＋</button></div>
+      <button class="tab-item"><span class="tab-icon">♡</span>お知らせ</button>
+      <button class="tab-item" onclick="goToMyPage('collection')"><span class="tab-icon">☺</span>マイページ</button>
+    </div>
+  </div>
+
+  <!-- ========== 2/4. COLLECTION CREATE (画面A) ========== -->
+  <div class="screen" data-screen="create">
+    <div class="sub-header">
+      <button class="back-btn" onclick="showScreen('home')">←</button>
+      <div class="sub-title">コレクションを作成</div>
+      <div class="sub-header-spacer"></div>
+    </div>
+    <div class="screen-body">
+      <div class="create-photo-area" id="createPhotoArea" onclick="onCreatePhotoAreaClick(event)"></div>
+
+      <div class="extract-btn-wrap" id="extractBtnWrap" style="display:none;">
+        <button class="extract-btn" onclick="startExtraction()">商品を抽出する</button>
+      </div>
+
+      <div class="tag-list-section" id="tagListSection" style="display:none;">
+        <div class="tag-list-title">認識された商品</div>
+        <div id="tagListRows"></div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-label">タイトル</div>
+        <input class="form-input" id="createTitleInput" placeholder="タイトルを入力" oninput="draft.title=this.value">
+        <div class="form-label">説明文</div>
+        <textarea class="form-textarea" id="createBodyInput" placeholder="説明文を入力" oninput="draft.body=this.value"></textarea>
+      </div>
+
+      <div class="post-btn-wrap">
+        <button class="post-btn" id="createPostBtn" disabled onclick="submitCollection()">投稿する</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 5. MYPAGE ========== -->
+  <div class="screen" data-screen="mypage">
+    <div class="sub-header">
+      <button class="back-btn" onclick="showScreen('home')">←</button>
+      <div class="sub-title">マイページ</div>
+      <div class="sub-header-spacer"></div>
+    </div>
+    <div class="screen-body">
+      <div class="profile-header">
+        <div class="profile-top">
+          <div class="avatar" id="mypageAvatar"></div>
+          <div>
+            <div class="profile-name" id="mypageName"></div>
+            <div class="profile-rating" id="mypageRating"></div>
+          </div>
+        </div>
+        <div class="profile-tabs">
+          <div class="profile-tab" data-tab="selling" onclick="setMyPageTab('selling')">出品中</div>
+          <div class="profile-tab" data-tab="collection" onclick="setMyPageTab('collection')">コレクション</div>
+          <div class="profile-tab" data-tab="bought" onclick="setMyPageTab('bought')">購入した商品</div>
+        </div>
+      </div>
+      <div id="mypageTabContent"></div>
+    </div>
+    <div class="tabbar">
+      <button class="tab-item" onclick="showScreen('home')"><span class="tab-icon">⌂</span>ホーム</button>
+      <button class="tab-item"><span class="tab-icon">⌕</span>さがす</button>
+      <button class="tab-item" onclick="openCreateScreen()">
+        <span class="collection-icon"><span class="sq sq1"></span><span class="sq sq2"></span></span>
+        コレクション
+      </button>
+      <div class="tab-sell"><button class="tab-sell-btn">＋</button></div>
+      <button class="tab-item"><span class="tab-icon">♡</span>お知らせ</button>
+      <button class="tab-item active"><span class="tab-icon">☺</span>マイページ</button>
+    </div>
+  </div>
+
+  <!-- ========== 6. DETAIL ========== -->
+  <div class="screen" data-screen="detail">
+    <div class="sub-header">
+      <button class="back-btn" onclick="goToMyPage('collection')">←</button>
+      <div class="sub-title">投稿</div>
+      <div class="sub-header-spacer"></div>
+    </div>
+    <div class="screen-body" id="detailScreenBody">
+      <div class="detail-user-row">
+        <div class="avatar small" id="detailAvatar"></div>
+        <div>
+          <div class="detail-user-name" id="detailUserName"></div>
+          <div class="detail-posted-at" id="detailPostedAt"></div>
+        </div>
+      </div>
+      <div class="detail-photo-wrap" id="detailPhotoWrap" onclick="closeDetailPopup()"></div>
+      <div class="detail-body-section">
+        <div class="detail-title" id="detailTitle"></div>
+        <div class="detail-text" id="detailBody"></div>
+      </div>
+      <div class="tag-chips" id="detailTagChips"></div>
+      <div class="action-bar">
+        <button class="action-item" id="detailLikeBtn" onclick="toggleLike()">
+          <span class="icon" id="detailLikeIcon">♡</span><span id="detailLikeCount">0</span>
+        </button>
+        <div class="action-item"><span class="icon">💬</span><span id="detailCommentCount">0</span></div>
+        <div class="action-item"><span class="icon">↗</span>シェア</div>
+      </div>
+      <div class="comments-section">
+        <div id="detailCommentsList"></div>
+        <div class="comment-input-row">
+          <input class="comment-input" id="detailCommentInput" placeholder="コメントする">
+          <button class="comment-send-btn" onclick="sendComment()">送信</button>
+        </div>
+      </div>
+    </div>
+    <div class="role-switch-banner" id="roleSwitchBanner">
+      <span>デモ：投稿者側の反応を見る</span>
+      <button onclick="handleSwitchRole()">投稿者の画面に切り替える</button>
+    </div>
+  </div>
+
+  <!-- ========== 8. NOTIFICATION ========== -->
+  <div class="screen" data-screen="notification">
+    <div class="sub-header">
+      <button class="back-btn" onclick="goToMyPage('collection')">←</button>
+      <div class="sub-title">お知らせ</div>
+      <div class="sub-header-spacer"></div>
+    </div>
+    <div class="screen-body">
+      <div class="notif-card">
+        <div class="notif-lead" id="notifLead"></div>
+        <div class="notif-buyer-row">
+          <div class="avatar small" id="notifBuyerAvatar"></div>
+          <div>
+            <div class="notif-buyer-name" id="notifBuyerName"></div>
+            <div class="notif-price" id="notifPrice"></div>
+          </div>
+        </div>
+        <div class="notif-btn-row">
+          <button class="notif-btn secondary" onclick="declineList()">今は出品しない</button>
+          <button class="notif-btn primary" onclick="startSellFromNotif()">出品する</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== SELL (prefilled) ========== -->
+  <div class="screen" data-screen="sell">
+    <div class="sub-header">
+      <button class="back-btn" onclick="showScreen('notification')">←</button>
+      <div class="sub-title">商品の情報を入力</div>
+      <div class="sub-header-spacer"></div>
+    </div>
+    <div class="screen-body">
+      <div class="sell-highlight">
+        買いたい人がすでにいます。内容を確認して出品してください。
+      </div>
+      <div class="sell-photo-row">
+        <img class="sell-photo" id="sellPhoto" onerror="onImgError(this)">
+      </div>
+      <div class="sell-field">
+        <div class="sell-field-label">商品名</div>
+        <input class="sell-field-value" id="sellNameInput">
+      </div>
+      <div class="sell-field">
+        <div class="sell-field-label">商品の説明</div>
+        <textarea class="sell-field-value" id="sellDescInput" style="min-height:60px;resize:none;"></textarea>
+      </div>
+      <div class="sell-static-row"><span>カテゴリー</span><span id="sellCategoryText"></span></div>
+      <div class="sell-static-row"><span>商品の状態</span><span>目立った傷や汚れなし</span></div>
+      <div class="sell-static-row"><span>配送料の負担</span><span>出品者が負担</span></div>
+      <div class="sell-field">
+        <div class="sell-field-label">販売価格</div>
+        <input class="sell-field-value" type="number" id="sellPriceInput">
+      </div>
+      <div class="sell-submit-wrap">
+        <button class="post-btn" onclick="completeSell()">出品する</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== SELL COMPLETE ========== -->
+  <div class="screen" data-screen="sell-complete">
+    <div class="sub-header">
+      <div class="sub-header-spacer"></div>
+      <div class="sub-title">完了</div>
+      <div class="sub-header-spacer"></div>
+    </div>
+    <div class="complete-wrap">
+      <div class="complete-check">✓</div>
+      <div class="complete-msg">出品しました</div>
+      <div class="complete-sub" id="completeSubText"></div>
+      <button class="complete-btn" onclick="goToMyPage('collection')">コレクションに戻る</button>
+    </div>
+  </div>
+
+  <!-- ========== bottom sheets ========== -->
+  <div class="sheet-backdrop" id="sheetBackdrop" onclick="closeSheet()"></div>
+
+  <div class="bottom-sheet" id="sheetPhoto">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">写真を追加</div>
+    <button class="sheet-option-btn" onclick="setDraftPhoto('photos/room-01.jpg')">📷 カメラで撮影</button>
+    <button class="sheet-option-btn" onclick="setDraftPhoto('photos/room-01.jpg')">🖼 アルバムから選ぶ</button>
+    <button class="sheet-cancel" onclick="closeSheet()">キャンセル</button>
+  </div>
+
+  <div class="bottom-sheet" id="sheetBuy">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">この商品を買いたいと伝えます</div>
+    <div style="font-size:13px;color:var(--sub);margin-bottom:12px;">対象：<span class="buy-target-name" id="buyTargetName"></span></div>
+    <div class="form-label">希望金額</div>
+    <div class="price-input-row">
+      <span>¥</span>
+      <input type="number" id="buyPriceNumber" value="3000" oninput="syncBuyPrice(this.value)">
+    </div>
+    <input type="range" class="price-slider" id="buyPriceRange" min="500" max="30000" step="100" value="3000" oninput="syncBuyPrice(this.value)">
+    <div class="sheet-note" id="buyNote"></div>
+    <button class="sheet-send-btn" onclick="submitBuy()">送る</button>
+  </div>
+
+  <!-- ========== loading overlay ========== -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loadingText">写真を解析しています</div>
+  </div>
+
+  <!-- ========== toast ========== -->
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+/* ==================== 定数・モックデータ ==================== */
+const PLACEHOLDER_IMG = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">'
+  + '<rect width="400" height="400" fill="#e3e3e3"/>'
+  + '<text x="50%" y="50%" font-size="18" fill="#aaa" text-anchor="middle" dominant-baseline="middle" font-family="sans-serif">No Image</text>'
+  + '</svg>'
+);
+function onImgError(img){ img.onerror = null; img.src = PLACEHOLDER_IMG; }
+
+const currentUser = { name:'ゆーこ', avatar:'ゆ', rating:'良い 12' };
+const demoBuyer = { name:'たなか', avatar:'た' };
+
+const mockExtract = [
+  { x:30, y:42, name:'木製のフロアランプ', category:'インテリア / ライト' },
+  { x:62, y:58, name:'編みかごのバスケット', category:'インテリア / 収納' },
+  { x:48, y:74, name:'ガラスの花器', category:'インテリア / 花瓶' },
+  { x:78, y:30, name:'額装されたポスター', category:'インテリア / アート' }
+];
+
+let tagIdCounter = 100;
+
+let collections = [
+  {
+    id:'c01', user:currentUser, photo:'photos/room-01.jpg',
+    title:'一人暮らしの部屋、3年目',
+    body:'少しずつ集めたものたちです。引っ越したときは何もなかった部屋も、ようやく落ち着いてきました。',
+    postedAt:'2時間前', likes:24, liked:false,
+    comments:[
+      { user:'あおい', text:'ランプどこのですか？' },
+      { user:'kzk', text:'雰囲気すごく好きです' }
+    ],
+    tags:[
+      { id:'t1', x:30, y:42, name:'木製のフロアランプ', category:'インテリア / ライト', status:'未出品', wants:[] },
+      { id:'t2', x:62, y:58, name:'編みかごのバスケット', category:'インテリア / 収納', status:'未出品', wants:[] },
+      { id:'t3', x:48, y:74, name:'ガラスの花器', category:'インテリア / 花瓶', status:'未出品', wants:[] },
+      { id:'t4', x:78, y:30, name:'額装されたポスター', category:'インテリア / アート', status:'未出品', wants:[] }
+    ]
+  },
+  {
+    id:'c02', user:currentUser, photo:'photos/desk-01.jpg',
+    title:'在宅ワークの机まわり',
+    body:'長時間座っても疲れにくい椅子を探して、ようやく今の組み合わせに落ち着きました。',
+    postedAt:'昨日', likes:41, liked:false,
+    comments:[
+      { user:'みずき', text:'キーボードかっこいい' },
+      { user:'yamada', text:'モニターアームどこの使ってますか' },
+      { user:'れい', text:'参考になります！' }
+    ],
+    tags:[
+      { id:'t5', x:35, y:36, name:'アーム式モニタースタンド', category:'家電 / PC周辺機器', status:'未出品', wants:[] },
+      { id:'t6', x:58, y:62, name:'メカニカルキーボード', category:'家電 / PC周辺機器', status:'未出品', wants:[] },
+      { id:'t7', x:22, y:70, name:'木製デスクマット', category:'インテリア / 雑貨', status:'未出品', wants:[] }
+    ]
+  },
+  {
+    id:'c03', user:currentUser, photo:'photos/outfit-01.jpg',
+    title:'今日のコーディネート',
+    body:'秋口はまだ調整が難しいですが、この組み合わせは気に入っています。',
+    postedAt:'3日前', likes:18, liked:false,
+    comments:[
+      { user:'つぐみ', text:'色の組み合わせ好き' }
+    ],
+    tags:[
+      { id:'t8', x:50, y:22, name:'ウールのコート', category:'レディース / アウター', status:'未出品', wants:[] },
+      { id:'t9', x:44, y:55, name:'レザーのベルト', category:'レディース / 小物', status:'未出品', wants:[] },
+      { id:'t10', x:60, y:82, name:'サイドゴアブーツ', category:'レディース / 靴', status:'未出品', wants:[] }
+    ]
+  }
+];
+
+const homeItems = [
+  { photo:'photos/p1.jpg', price:'3,200', title:'ヴィンテージ木製チェア' },
+  { photo:'photos/p2.jpg', price:'980', title:'コーヒーミル 手動' },
+  { photo:'photos/p3.jpg', price:'5,500', title:'デニムジャケット Mサイズ' },
+  { photo:'photos/p4.jpg', price:'1,200', title:'陶器の一輪挿し' },
+  { photo:'photos/p5.jpg', price:'7,800', title:'折りたたみ自転車' },
+  { photo:'photos/p6.jpg', price:'450', title:'文庫本 5冊セット' }
+];
+
+/* ==================== 画面遷移 ==================== */
+function showScreen(name){
+  document.querySelectorAll('.screen').forEach(function(el){
+    el.classList.toggle('active', el.dataset.screen === name);
+  });
+  closeSheet();
+  var body = document.querySelector('.screen[data-screen="' + name + '"] .screen-body');
+  if(body) body.scrollTop = 0;
+}
+
+/* ==================== ホーム ==================== */
+function renderHomeGrid(){
+  var grid = document.getElementById('homeGrid');
+  grid.innerHTML = homeItems.map(function(item){
+    return '<div class="product-card">'
+      + '<img class="product-photo" src="' + item.photo + '" onerror="onImgError(this)">'
+      + '<div class="product-price">¥' + item.price + '</div>'
+      + '<div class="product-title">' + item.title + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+/* ==================== コレクション作成（画面A） ==================== */
+let draft = { photo:null, title:'', body:'', tags:[] };
+
+function openCreateScreen(){
+  draft = { photo:null, title:'', body:'', tags:[] };
+  document.getElementById('createTitleInput').value = '';
+  document.getElementById('createBodyInput').value = '';
+  renderCreateScreen();
+  showScreen('create');
+}
+
+function renderCreateScreen(){
+  var area = document.getElementById('createPhotoArea');
+  if(!draft.photo){
+    area.innerHTML = '<div class="create-photo-empty"><button class="add-photo-btn" onclick="event.stopPropagation();openSheet(\'sheetPhoto\')">＋ 写真を追加</button></div>';
+  } else {
+    area.innerHTML = '<img src="' + draft.photo + '" onerror="onImgError(this)">'
+      + '<div class="tag-popup" id="createPopup"></div>';
+    renderPins(area, draft.tags, onCreatePinClick);
+  }
+
+  document.getElementById('extractBtnWrap').style.display = (draft.photo && draft.tags.length === 0) ? 'block' : 'none';
+
+  var tagSection = document.getElementById('tagListSection');
+  if(draft.tags.length > 0){
+    tagSection.style.display = 'block';
+    document.getElementById('tagListRows').innerHTML = draft.tags.map(function(t){
+      return '<div class="tag-row ' + (t.included ? '' : 'excluded') + '">'
+        + '<div class="tag-row-info">'
+        + '<input class="tag-name-input" value="' + t.name + '" oninput="updateTagName(\'' + t.id + '\', this.value)">'
+        + '<div class="tag-category">' + t.category + '</div>'
+        + '</div>'
+        + '<div class="switch ' + (t.included ? 'on' : '') + '" onclick="toggleTagIncluded(\'' + t.id + '\')"><div class="knob"></div></div>'
+        + '</div>';
+    }).join('');
+  } else {
+    tagSection.style.display = 'none';
+  }
+
+  document.getElementById('createPostBtn').disabled = draft.tags.length === 0;
+}
+
+function onCreatePhotoAreaClick(e){
+  if(!draft.photo){
+    openSheet('sheetPhoto');
+  } else {
+    closeCreatePopup();
+  }
+}
+
+function setDraftPhoto(path){
+  draft.photo = path;
+  closeSheet();
+  renderCreateScreen();
+}
+
+function updateTagName(id, val){
+  var t = draft.tags.find(function(x){ return x.id === id; });
+  if(t) t.name = val;
+}
+
+function toggleTagIncluded(id){
+  var t = draft.tags.find(function(x){ return x.id === id; });
+  if(t) t.included = !t.included;
+  renderCreateScreen();
+}
+
+/* ---- 抽出（モック） ---- */
+function startExtraction(){
+  var overlay = document.getElementById('loadingOverlay');
+  var textEl = document.getElementById('loadingText');
+  var steps = ['写真を解析しています', '商品を認識しています', 'タグを作成しています'];
+  var i = 0;
+  textEl.textContent = steps[0];
+  overlay.classList.add('active');
+  var interval = setInterval(function(){
+    i++;
+    if(i < steps.length){
+      textEl.textContent = steps[i];
+    } else {
+      clearInterval(interval);
+      finishExtraction();
+    }
+  }, 1200);
+}
+
+function finishExtraction(){
+  draft.tags = mockExtract.map(function(m){
+    tagIdCounter++;
+    return { id:'draft' + tagIdCounter, x:m.x, y:m.y, name:m.name, category:m.category, included:true };
+  });
+  document.getElementById('loadingOverlay').classList.remove('active');
+  renderCreateScreen();
+}
+
+/* ---- ピン共通処理 ---- */
+function renderPins(container, tags, onClick){
+  tags.forEach(function(tag){
+    if(tag.included === false) return;
+    var pin = document.createElement('div');
+    pin.className = 'pin';
+    pin.style.left = tag.x + '%';
+    pin.style.top = tag.y + '%';
+    pin.onclick = function(e){ e.stopPropagation(); onClick(tag); };
+    container.appendChild(pin);
+  });
+}
+
+function onCreatePinClick(tag){
+  var popup = document.getElementById('createPopup');
+  popup.innerHTML = '<div class="tp-name">' + tag.name + '</div>'
+    + '<div class="tp-cat">' + tag.category + '</div>';
+  popup.style.left = tag.x + '%';
+  popup.style.top = tag.y + '%';
+  popup.classList.add('active');
+}
+function closeCreatePopup(){
+  var popup = document.getElementById('createPopup');
+  if(popup) popup.classList.remove('active');
+}
+
+function submitCollection(){
+  if(draft.tags.length === 0) return;
+  var includedTags = draft.tags.filter(function(t){ return t.included; }).map(function(t){
+    return { id:t.id, x:t.x, y:t.y, name:t.name, category:t.category, status:'未出品', wants:[] };
+  });
+  var newCollection = {
+    id:'c' + Date.now(),
+    user:currentUser,
+    photo:draft.photo,
+    title:draft.title || '(無題)',
+    body:draft.body || '',
+    postedAt:'たった今',
+    likes:0, liked:false,
+    comments:[],
+    tags:includedTags
+  };
+  collections.unshift(newCollection);
+  goToMyPage('collection');
+}
+
+/* ==================== マイページ ==================== */
+let myPageTab = 'collection';
+
+function goToMyPage(tab){
+  setMyPageTab(tab || 'collection');
+  showScreen('mypage');
+}
+
+function setMyPageTab(tab){
+  myPageTab = tab;
+  document.getElementById('mypageAvatar').textContent = currentUser.avatar;
+  document.getElementById('mypageName').textContent = currentUser.name;
+  document.getElementById('mypageRating').textContent = '評価：' + currentUser.rating;
+  document.querySelectorAll('.profile-tab').forEach(function(el){
+    el.classList.toggle('active', el.dataset.tab === tab);
+  });
+
+  var content = document.getElementById('mypageTabContent');
+  if(tab === 'collection'){
+    content.innerHTML = '<div class="collection-grid" id="collectionGrid"></div>';
+    var grid = document.getElementById('collectionGrid');
+    grid.innerHTML = collections.map(function(c){
+      return '<div class="collection-cell" onclick="openDetail(\'' + c.id + '\')">'
+        + '<div class="collection-cell-photo-wrap">'
+        + '<img class="collection-cell-photo" src="' + c.photo + '" onerror="onImgError(this)">'
+        + '<div class="tag-count-badge">🏷 ' + c.tags.length + '</div>'
+        + '</div>'
+        + '<div class="collection-cell-meta">♡ ' + c.likes + '</div>'
+        + '</div>';
+    }).join('');
+  } else if(tab === 'selling'){
+    content.innerHTML = '<div class="empty-state">出品中の商品はありません</div>';
+  } else {
+    content.innerHTML = '<div class="empty-state">購入した商品はありません</div>';
+  }
+}
+
+/* ==================== 投稿詳細 ==================== */
+let currentDetailId = null;
+
+function findCollection(id){
+  return collections.find(function(c){ return c.id === id; });
+}
+
+function openDetail(id){
+  currentDetailId = id;
+  renderDetail();
+  showScreen('detail');
+  document.getElementById('roleSwitchBanner').classList.remove('active');
+}
+
+function renderDetail(){
+  var c = findCollection(currentDetailId);
+  if(!c) return;
+
+  document.getElementById('detailAvatar').textContent = c.user.avatar;
+  document.getElementById('detailUserName').textContent = c.user.name;
+  document.getElementById('detailPostedAt').textContent = c.postedAt;
+
+  var photoWrap = document.getElementById('detailPhotoWrap');
+  photoWrap.innerHTML = '<img src="' + c.photo + '" onerror="onImgError(this)">'
+    + '<div class="tag-popup" id="detailPopup"></div>';
+  renderPins(photoWrap, c.tags, onDetailPinClick);
+
+  document.getElementById('detailTitle').textContent = c.title;
+  document.getElementById('detailBody').textContent = c.body;
+
+  document.getElementById('detailTagChips').innerHTML = c.tags.map(function(t){
+    return '<div class="tag-chip">' + t.name + '</div>';
+  }).join('');
+
+  document.getElementById('detailLikeCount').textContent = c.likes;
+  document.getElementById('detailLikeBtn').classList.toggle('liked', c.liked);
+  document.getElementById('detailLikeIcon').textContent = c.liked ? '♥' : '♡';
+  document.getElementById('detailCommentCount').textContent = c.comments.length;
+
+  document.getElementById('detailCommentsList').innerHTML = c.comments.map(function(cm){
+    return '<div class="comment-row"><span class="comment-user">' + cm.user + '</span>' + cm.text + '</div>';
+  }).join('');
+}
+
+function toggleLike(){
+  var c = findCollection(currentDetailId);
+  if(!c) return;
+  c.liked = !c.liked;
+  c.likes += c.liked ? 1 : -1;
+  document.getElementById('detailLikeCount').textContent = c.likes;
+  document.getElementById('detailLikeBtn').classList.toggle('liked', c.liked);
+  document.getElementById('detailLikeIcon').textContent = c.liked ? '♥' : '♡';
+}
+
+function sendComment(){
+  var input = document.getElementById('detailCommentInput');
+  var text = input.value.trim();
+  if(!text) return;
+  var c = findCollection(currentDetailId);
+  c.comments.push({ user:'あなた', text:text });
+  input.value = '';
+  document.getElementById('detailCommentCount').textContent = c.comments.length;
+  document.getElementById('detailCommentsList').innerHTML = c.comments.map(function(cm){
+    return '<div class="comment-row"><span class="comment-user">' + cm.user + '</span>' + cm.text + '</div>';
+  }).join('');
+}
+
+function closeDetailPopup(){
+  var popup = document.getElementById('detailPopup');
+  if(popup) popup.classList.remove('active');
+}
+
+function onDetailPinClick(tag){
+  var popup = document.getElementById('detailPopup');
+  popup.innerHTML = '<div class="tp-name">' + tag.name + '</div>'
+    + '<div class="tp-cat">' + tag.category + '</div>'
+    + '<div class="tp-status">' + tag.status + '</div>'
+    + '<button class="tp-buy-btn" onclick="openBuySheet(\'' + tag.id + '\')">買いたい</button>';
+  popup.style.left = tag.x + '%';
+  popup.style.top = tag.y + '%';
+  popup.classList.add('active');
+}
+
+/* ==================== 買いたいシート ==================== */
+let currentBuyTagId = null;
+let currentBuyPrice = 3000;
+
+function openBuySheet(tagId){
+  currentBuyTagId = tagId;
+  var c = findCollection(currentDetailId);
+  var tag = c.tags.find(function(t){ return t.id === tagId; });
+  document.getElementById('buyTargetName').textContent = tag.name;
+  document.getElementById('buyNote').textContent = c.user.name + 'さんに通知されます。出品するかどうかは相手が決めます。';
+  currentBuyPrice = 3000;
+  document.getElementById('buyPriceNumber').value = currentBuyPrice;
+  document.getElementById('buyPriceRange').value = currentBuyPrice;
+  closeDetailPopup();
+  openSheet('sheetBuy');
+}
+
+function syncBuyPrice(v){
+  v = parseInt(v, 10) || 0;
+  document.getElementById('buyPriceNumber').value = v;
+  document.getElementById('buyPriceRange').value = v;
+  currentBuyPrice = v;
+}
+
+function submitBuy(){
+  var c = findCollection(currentDetailId);
+  var tag = c.tags.find(function(t){ return t.id === currentBuyTagId; });
+  tag.wants.push({ from:demoBuyer.name, price:currentBuyPrice, at:'たった今' });
+  closeSheet();
+  showToast('伝えました');
+  setTimeout(function(){
+    document.getElementById('roleSwitchBanner').classList.add('active');
+  }, 500);
+}
+
+/* ==================== 投稿者側への切り替え ==================== */
+let notifCollectionId = null;
+let notifTagId = null;
+
+function handleSwitchRole(){
+  var c = findCollection(currentDetailId);
+  var tag = c.tags.slice().reverse().find(function(t){ return t.wants.length > 0; });
+  if(!tag) return;
+  notifCollectionId = c.id;
+  notifTagId = tag.id;
+  var want = tag.wants[tag.wants.length - 1];
+
+  document.getElementById('notifLead').innerHTML = 'あなたのコレクションの『<b>' + tag.name + '</b>』に、買いたいという人がいます';
+  document.getElementById('notifBuyerAvatar').textContent = demoBuyer.avatar;
+  document.getElementById('notifBuyerName').textContent = want.from + 'さん';
+  document.getElementById('notifPrice').textContent = '希望金額 ¥' + want.price.toLocaleString();
+
+  showScreen('notification');
+}
+
+function declineList(){
+  showToast('また今度、出品するか検討できます');
+  goToMyPage('collection');
+}
+
+/* ==================== 出品（プリフィル） ==================== */
+function startSellFromNotif(){
+  var c = findCollection(notifCollectionId);
+  var tag = c.tags.find(function(t){ return t.id === notifTagId; });
+  var want = tag.wants[tag.wants.length - 1];
+
+  document.getElementById('sellPhoto').src = c.photo;
+  document.getElementById('sellNameInput').value = tag.name;
+  document.getElementById('sellDescInput').value = c.body;
+  document.getElementById('sellCategoryText').textContent = tag.category;
+  document.getElementById('sellPriceInput').value = want.price;
+
+  showScreen('sell');
+}
+
+function completeSell(){
+  var c = findCollection(notifCollectionId);
+  var tag = c.tags.find(function(t){ return t.id === notifTagId; });
+  tag.status = '出品中';
+  document.getElementById('completeSubText').textContent = '「' + tag.name + '」の出品が完了しました。買いたいと伝えてくれた人に届きます。';
+  showScreen('sell-complete');
+}
+
+/* ==================== 汎用：ボトムシート / トースト ==================== */
+function openSheet(id){
+  document.getElementById('sheetBackdrop').classList.add('active');
+  document.getElementById(id).classList.add('active');
+}
+function closeSheet(){
+  document.getElementById('sheetBackdrop').classList.remove('active');
+  document.getElementById('sheetPhoto').classList.remove('active');
+  document.getElementById('sheetBuy').classList.remove('active');
+}
+function showToast(msg){
+  var toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('active');
+  setTimeout(function(){ toast.classList.remove('active'); }, 1800);
+}
+
+/* ==================== 初期化 ==================== */
+renderHomeGrid();
+</script>
