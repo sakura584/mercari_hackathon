@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createSession } from "./session-repository";
+import { createCollection } from "./collection-repository";
 import {
   createItem,
   listItems,
@@ -9,37 +9,52 @@ import {
 
 describe("item-repository", () => {
   it("creates an item with an estimated price and lists it", async () => {
-    const session = await createSession({ purposeType: "declutter" });
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
     const item = await createItem({
-      sessionId: session.id,
+      collectionId: collection.id,
       imageUrl: "https://example.com/shirt.jpg",
       title: "サークルTシャツ",
       category: "clothing_tshirt",
     });
 
     expect(item.id).toBeTruthy();
-    expect(item.sessionId).toBe(session.id);
+    expect(item.collectionId).toBe(collection.id);
     expect(item.estimatedPrice).toBeGreaterThan(0);
 
-    const items = await listItems(session.id);
+    const items = await listItems(collection.id);
     expect(items).toHaveLength(1);
     expect(items[0].id).toBe(item.id);
   });
 
   it("updates classification and final decision", async () => {
-    const session = await createSession({ purposeType: "declutter" });
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
     const item = await createItem({
-      sessionId: session.id,
+      collectionId: collection.id,
       imageUrl: "https://example.com/book.jpg",
       title: "小説",
       category: "book",
     });
 
-    await updateItemClassification(session.id, item.id, "unsure");
-    await updateItemDecision(session.id, item.id, "let_go");
+    await updateItemClassification(collection.id, item.id, "unsure");
+    await updateItemDecision(collection.id, item.id, "let_go");
 
-    const [updated] = await listItems(session.id);
+    const [updated] = await listItems(collection.id);
     expect(updated.initialClassification).toBe("unsure");
     expect(updated.finalDecision).toBe("let_go");
+  });
+
+  it("stores pin coordinates when provided", async () => {
+    const collection = await createCollection({ ownerName: "A", title: "コレクション" });
+    const item = await createItem({
+      collectionId: collection.id,
+      imageUrl: "https://example.com/lamp.jpg",
+      title: "フロアランプ",
+      category: "default",
+      x: 30,
+      y: 42,
+    });
+
+    expect(item.x).toBe(30);
+    expect(item.y).toBe(42);
   });
 });

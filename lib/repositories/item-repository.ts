@@ -4,49 +4,53 @@ import { estimatePrice } from "../pricing";
 import type { FinalDecision, Item, ItemClassification } from "../types";
 
 export async function createItem(input: {
-  sessionId: string;
+  collectionId: string;
   imageUrl: string;
   sourceImageId?: string;
   title: string;
   category: string;
+  x?: number;
+  y?: number;
 }): Promise<Item> {
   const db = getAdminFirestore();
-  const ref = db.collection(itemsCollectionPath(input.sessionId)).doc();
+  const ref = db.collection(itemsCollectionPath(input.collectionId)).doc();
   const item: Item = {
     id: ref.id,
-    sessionId: input.sessionId,
+    collectionId: input.collectionId,
     imageUrl: input.imageUrl,
     sourceImageId: input.sourceImageId,
     title: input.title,
     category: input.category,
     estimatedPrice: estimatePrice(input.category),
+    x: input.x,
+    y: input.y,
   };
   await ref.set(item);
   return item;
 }
 
-export async function listItems(sessionId: string): Promise<Item[]> {
+export async function listItems(collectionId: string): Promise<Item[]> {
   const db = getAdminFirestore();
-  const snapshot = await db.collection(itemsCollectionPath(sessionId)).get();
+  const snapshot = await db.collection(itemsCollectionPath(collectionId)).get();
   return snapshot.docs.map((doc) => doc.data() as Item);
 }
 
 export async function updateItemClassification(
-  sessionId: string,
+  collectionId: string,
   itemId: string,
   classification: ItemClassification
 ): Promise<void> {
   const db = getAdminFirestore();
-  await db.doc(itemPath(sessionId, itemId)).update({
+  await db.doc(itemPath(collectionId, itemId)).update({
     initialClassification: classification,
   });
 }
 
 export async function updateItemDecision(
-  sessionId: string,
+  collectionId: string,
   itemId: string,
   decision: FinalDecision
 ): Promise<void> {
   const db = getAdminFirestore();
-  await db.doc(itemPath(sessionId, itemId)).update({ finalDecision: decision });
+  await db.doc(itemPath(collectionId, itemId)).update({ finalDecision: decision });
 }

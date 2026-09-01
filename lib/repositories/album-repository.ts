@@ -3,11 +3,11 @@ import { albumCollectionPath } from "../firestore-paths";
 import type { MemoryRecord } from "../types";
 
 export async function createAlbumEntry(
-  sessionId: string,
+  collectionId: string,
   input: Omit<MemoryRecord, "id" | "createdAt">
 ): Promise<MemoryRecord> {
   const db = getAdminFirestore();
-  const ref = db.collection(albumCollectionPath(sessionId)).doc();
+  const ref = db.collection(albumCollectionPath(collectionId)).doc();
   const entry: MemoryRecord = {
     ...input,
     id: ref.id,
@@ -17,10 +17,10 @@ export async function createAlbumEntry(
   return entry;
 }
 
-export async function listAlbumEntries(sessionId: string): Promise<MemoryRecord[]> {
+export async function listAlbumEntries(collectionId: string): Promise<MemoryRecord[]> {
   const db = getAdminFirestore();
   const snapshot = await db
-    .collection(albumCollectionPath(sessionId))
+    .collection(albumCollectionPath(collectionId))
     .orderBy("createdAt", "desc")
     .get();
   return snapshot.docs.map((doc) => doc.data() as MemoryRecord);
