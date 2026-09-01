@@ -38,6 +38,8 @@ type Item = {
   estimatedPrice?: number;
   initialClassification?: ItemClassification;
   finalDecision?: FinalDecision;
+  x?: number;                // UIプロトタイプのピン表示用。写真上の位置（0〜100のパーセンテージ、中心点）
+  y?: number;
 };
 
 type AttachmentType =
@@ -79,6 +81,29 @@ type MemoryRecord = {
   soldPrice?: number;
   listedAt?: string;
   soldAt?: string;
+  createdAt: string;
+};
+
+// --- 新規：UIプロトタイプとの整合（11節参照） ---
+
+type BuyRequestStatus = "pending" | "declined" | "listed";
+
+type BuyRequest = {
+  id: string;
+  collectionId: string;
+  itemId: string;
+  itemName: string;
+  fromName: string;          // 申し出た人の表示名（ログインなしなのでUIが自己申告させる）
+  price: number;
+  status: BuyRequestStatus;
+  createdAt: string;
+};
+
+type Comment = {
+  id: string;
+  collectionId: string;
+  authorName: string;
+  text: string;
   createdAt: string;
 };
 
@@ -152,6 +177,8 @@ if (mode === "single" && candidates.length > 1) {
 ```
 
 価格モック・フォールバック（`lib/extraction-fallback.ts`）・Firebase Storageアップロードのロジックは変更しない。
+
+**ピン座標の追加**：UIプロトタイプは抽出結果を写真上のピン（クリック可能な点）として表示するため、抽出スキーマに`x`・`y`（画像左上を原点とした0〜100のパーセンテージ、対象物の中心点の目安）を追加する。Geminiは画像内の物体のおおよその位置を返せるため、`EXTRACT_ITEMS_SCHEMA`の各item要素に`x: { type: "number" }`・`y: { type: "number" }`を追加し、`createItem`にも`x`・`y`を渡す。Geminiが座標を返さない・信頼できない場合のフォールバックとして、`x`・`y`が省略された場合はUIが適当な位置に配置する想定でよい（バックエンド側はoptionalとして扱うだけ）。
 
 ## 5. Item単位のReflection Agent（変更なし、Collection配下に移動のみ）
 
@@ -266,7 +293,7 @@ POST /api/collections/{collectionId}/suggest-release
 | --- | --- | --- |
 | `POST /api/collections` | コレクション作成 | body: `{ ownerName: string; title: string }` → `Collection`（201） |
 | `GET /api/collections` | 公開コレクション一覧 | P1。新しい順。`{ collections: Collection[] }` |
-| `GET /api/collections/{id}` | コレクション詳細（items含む） | `{ collection: Collection; items: Item[] }` |
+| `GET /api/collections/{id}` | コレクション詳細（items・comments含む） | `{ collection: Collection; items: Item[]; comments: Comment[] }` |
 | `POST /api/items/extract` | 画像から商品候補を抽出 | body に`collectionId`・`mode?`を追加（4節参照） |
 | `PATCH /api/collections/{id}/items/{itemId}/classification` | 一次分類の保存 | 変更なし（パスのみ） |
 | `POST /api/collections/{id}/items/{itemId}/reflection` | item単位対話開始 | 変更なし（パスのみ） |
@@ -275,6 +302,9 @@ POST /api/collections/{collectionId}/suggest-release
 | `GET /api/collections/{id}/album` | アルバム一覧 | 変更なし（パスのみ） |
 | `POST /api/collections/{id}/suggest-release` | ワンショット手放し提案 | 新規（6節） |
 | `POST /api/collections/{id}/like` | いいね | P1。body: `{ likerId: string }`。`likes/{likerId}`が既存なら何もせず現在の`likeCount`を返す（冪等）。新規なら`likeCount`を`FieldValue.increment(1)`で更新 |
+| `POST /api/collections/{id}/items/{itemId}/buy-requests` | 「買いたい」申し出の作成 | 新規（11節） |
+| `GET /api/collections/{id}/buy-requests` | 保留中の「買いたい」申し出一覧 | 新規（11節）。`status: "pending"`のみ返す |
+| `POST /api/collections/{id}/comments` | コメント投稿 | 新規（11節） |
 
 ## 8. 表示名・いいねの扱い（バックエンド視点、P1）
 
@@ -297,5 +327,47 @@ POST /api/collections/{collectionId}/suggest-release
 - `lib/repositories/album-repository.ts`（同上）
 - `app/api/sessions/**` → `app/api/collections/**`（ディレクトリごと移動）
 - `app/api/items/extract/route.ts`（body の`sessionId`→`collectionId`、`mode`追加）
+
+## 11. UIプロトタイプとの整合（追記）
+
+UI担当が作成したプロトタイプ（`collection.html`）を確認した結果、「手放しの後押し」の見せ方が本書の当初案（コレクション詳細画面の専用ボタン→提案一覧画面）とは異なり、**「お知らせ」画面に届く1件ずつの通知カード**（`notifLead`/`notifBuyerRow`/`notifBtnRow`のUI）→「出品する」で出品確認画面へ、という形で実装されていた。UIのこの画面構成はそのまま活かし、通知を発生させるトリガーを2種類にする。
+
+1. **実際の「買いたい」申し出**：他人がコレクション上のピンをタップし、希望価格を添えて送る（`BuyRequest`を作成）
+2. **AIによる提案**：お知らせ画面を開いたタイミングで、そのユーザーが持つコレクションに保留中の`BuyRequest`が無ければ、`suggest-release`（6節、変更なし）を呼び出し、候補が1件でもあれば同じ通知カードの形式で表示する
+
+どちらの経路で来た通知も、確定操作は同じ`decision`API（`decision: "let_go"`）を呼ぶだけでよい。バックエンドは両トリガー用の一覧・作成APIを提供するだけで、「どちらを先に見せるか」「AI提案をいつ呼ぶか」はUI側の判断に委ねる（本書のスコープ外）。
+
+### 11.1 API
+
+```
+POST /api/collections/{collectionId}/items/{itemId}/buy-requests
+```
+- Request body: `{ fromName: string; price: number }`
+- Response（201）: `BuyRequest`
+
+```
+GET /api/collections/{collectionId}/buy-requests
+```
+- Response（200）: `{ buyRequests: BuyRequest[] }`（`status: "pending"`のみ）
+
+```
+POST /api/collections/{collectionId}/comments
+```
+- Request body: `{ authorName: string; text: string }`
+- Response（201）: `Comment`
+
+コメント一覧は専用エンドポイントを設けず、`GET /api/collections/{id}`のレスポンスに含める（7節のAPI一覧を参照）。
+
+### 11.2 Firestoreパス
+
+```
+collections/{collectionId}/buy-requests/{buyRequestId}
+collections/{collectionId}/comments/{commentId}
+```
+
+### 11.3 非スコープ
+
+- 実際の出品（`decision`のlet_go）が完了した`BuyRequest`の`status`を`"listed"`に更新する処理は、`decision`API内で`itemId`に紐づく保留中の`BuyRequest`があれば更新する形にする（UIの`completeSell`相当）。これがない場合でも動作に支障はないため、時間が余れば実装する程度の優先度でよい
+- 「買いたい」申し出への価格交渉・複数申し出の順序付けは行わない（プロトタイプにもない）
 
 非機能要件（Firebaseエミュレータ運用方針、APIキー管理、コスト対策）は旧要件定義書10節から変更なし。
